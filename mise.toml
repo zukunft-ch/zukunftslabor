@@ -14,17 +14,38 @@ run = """
 set -euo pipefail
 
 COOKIE="zukunftslabor"
-NODE="zukunftslabor@127.0.0.1"
+NODE_NAME="zukunftslabor"
+NODE="$NODE_NAME@127.0.0.1"
 PORT="${LIVEBOOK_PORT:-8080}"
 
-# Start project node in background
-echo "==> Starting project node ($NODE)..."
-elixir --name "$NODE" --cookie "$COOKIE" -S mix run --no-halt &
-NODE_PID=$!
-trap "kill $NODE_PID 2>/dev/null" EXIT
-sleep 3
+# Check if node is already running
+if epmd -names 2>/dev/null | grep -q "name $NODE_NAME"; then
+  echo "==> Project node already running, attaching LiveBook..."
+else
+  echo "==> Starting project node ($NODE)..."
+  elixir --name "$NODE" --cookie "$COOKIE" -S mix run --no-halt &
+  NODE_PID=$!
+  trap "kill $NODE_PID 2>/dev/null" EXIT
 
-# Start LiveBook attached to it
+  # Wait for node to register with epmd (up to 15s)
+  for i in $(seq 1 30); do
+    if epmd -names 2>/dev/null | grep -q "name $NODE_NAME"; then
+      echo "==> Node ready."
+      break
+    fi
+    if ! kill -0 "$NODE_PID" 2>/dev/null; then
+      echo "!! Node process exited unexpectedly." >&2
+      exit 1
+    fi
+    sleep 0.5
+  done
+
+  if ! epmd -names 2>/dev/null | grep -q "name $NODE_NAME"; then
+    echo "!! Node failed to register within 15s." >&2
+    exit 1
+  fi
+fi
+
 echo "==> Starting LiveBook on port $PORT..."
 LIVEBOOK_HOME="$(pwd)/notebooks" \
 LIVEBOOK_DEFAULT_RUNTIME="attached:$NODE:$COOKIE" \
