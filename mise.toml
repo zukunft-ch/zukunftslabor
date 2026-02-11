@@ -1,0 +1,58 @@
+[tools]
+erlang = "27.3.4.6"
+elixir = "1.19.5-otp-27"
+python = "3.13"
+
+[tasks.fetch]
+description = "Download all registered datasets"
+run = ".venv/bin/python scripts/fetch_bfs.py"
+
+[tasks.lab]
+description = "Start LiveBook server"
+run = "livebook server --default-runtime attached:zukunftslabor:$(elixir --sname zukunftslabor -e '' &>/dev/null & echo $!)"
+
+[tasks.export]
+description = "Export notebook → draft + charts"
+run = "mix zukunftslabor.export {{arg(name='path')}}"
+
+[tasks.publish]
+description = "Copy reviewed drafts + charts to die-zukunft.ch"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+
+site="../die-zukunft.ch"
+charts_dir="$site/static/zukunftslabor/charts"
+content_dir="$site/content/zukunftslabor/notizen"
+
+mkdir -p "$charts_dir" "$content_dir"
+
+if ls output/charts/*.svg 1>/dev/null 2>&1; then
+  cp output/charts/*.svg "$charts_dir/"
+  echo "Copied charts → $charts_dir"
+fi
+
+if ls output/drafts/*.md 1>/dev/null 2>&1; then
+  cp output/drafts/*.md "$content_dir/"
+  echo "Copied drafts → $content_dir"
+fi
+
+echo "Run 'zola build' in $site to verify."
+"""
+
+[tasks.test]
+description = "Run Elixir tests"
+run = "mix test"
+
+[tasks.setup]
+description = "Install all dependencies"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+echo "==> Installing Elixir deps..."
+mix deps.get
+echo "==> Setting up Python venv..."
+python -m venv .venv
+.venv/bin/pip install -r scripts/requirements.txt
+echo "==> Done."
+"""

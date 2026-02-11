@@ -1,0 +1,33 @@
+# Elixir
+/_build/
+/deps/
+*.beam
+*.ez
+erl_crash.dump
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Data (raw + processed are large, only registry is tracked)
+data/raw/
+data/processed/
+
+# Output (generated, reviewed manually before publishing)
+output/drafts/
+output/charts/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# LiveBook
+.livebook/

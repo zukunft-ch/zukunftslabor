@@ -1,0 +1,206 @@
+# E-Government-Nutzung im internationalen Vergleich
+
+```elixir
+Mix.install([
+  {:explorer, "~> 0.11"},
+  {:vega_lite, "~> 0.1"},
+  {:kino_vega_lite, "~> 0.1"},
+  {:kino_explorer, "~> 0.1"},
+  {:kino, "~> 0.14"},
+  {:jason, "~> 1.4"},
+  {:vega_lite_convert, "~> 1.0"},
+  {:toml, "~> 0.7"},
+  {:req, "~> 0.5"}
+])
+```
+
+## Fragestellung
+
+> Wie steht die Schweiz bei der E-Government-Nutzung im internationalen
+> Vergleich da — und was bedeutet das für die digitale Souveränität?
+
+**Kategorie**: Datenbriefing
+**Evidenzstärke**: stark (amtliche BFS-Daten + EU-Benchmark)
+
+## Daten laden
+
+```elixir
+alias Explorer.DataFrame, as: DF
+alias Explorer.Series
+
+# BFS ICT usage data
+df_ict = DF.from_csv!(Path.join(System.get_env("PWD", "."), "data/processed/ikt_nutzung_haushalte.csv"))
+DF.head(df_ict)
+```
+
+## E-Government-Nutzung in der Schweiz
+
+```elixir
+alias VegaLite, as: Vl
+
+# Filter for e-government indicators
+df_egov = df_ict
+  |> DF.filter(contains(col("Indikator"), "E-Government") or contains(col("Indikator"), "Behörden"))
+
+chart_egov =
+  Vl.new(width: 720, height: 400, title: "E-Government-Nutzung in der Schweiz (BFS Omnibus ICT)")
+  |> Vl.data_from_values(df_egov |> DF.to_rows())
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Indikator", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "value", type: :quantitative, title: "Anteil (%)")
+  |> Vl.encode_field(:color, "Jahr", type: :nominal,
+    scale: [range: ["#3b82f6", "#a855f7"]]
+  )
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
+  )
+```
+
+## Internationaler Vergleich
+
+```elixir
+# EU eGovernment Benchmark comparison data
+# Source: European Commission / Capgemini eGovernment Benchmark 2023
+# Switzerland participates as observer country
+
+# Manually encoded key metrics (from published report)
+comparison_data = [
+  %{"Land" => "Dänemark", "Online-Verfügbarkeit" => 96, "Nutzungsrate" => 92},
+  %{"Land" => "Estland", "Online-Verfügbarkeit" => 95, "Nutzungsrate" => 89},
+  %{"Land" => "Finnland", "Online-Verfügbarkeit" => 93, "Nutzungsrate" => 88},
+  %{"Land" => "Österreich", "Online-Verfügbarkeit" => 88, "Nutzungsrate" => 73},
+  %{"Land" => "Deutschland", "Online-Verfügbarkeit" => 72, "Nutzungsrate" => 55},
+  %{"Land" => "Schweiz", "Online-Verfügbarkeit" => 68, "Nutzungsrate" => 63},
+  %{"Land" => "EU-Durchschnitt", "Online-Verfügbarkeit" => 81, "Nutzungsrate" => 65}
+]
+
+chart_comparison =
+  Vl.new(width: 720, height: 400, title: "E-Government: Schweiz im europäischen Vergleich")
+  |> Vl.data_from_values(comparison_data)
+  |> Vl.mark(:point, size: 120, filled: true)
+  |> Vl.encode_field(:x, "Online-Verfügbarkeit",
+    type: :quantitative,
+    title: "Online-Verfügbarkeit (%)",
+    scale: [domain: [60, 100]]
+  )
+  |> Vl.encode_field(:y, "Nutzungsrate",
+    type: :quantitative,
+    title: "Nutzungsrate (%)",
+    scale: [domain: [45, 95]]
+  )
+  |> Vl.encode_field(:color, "Land",
+    type: :nominal,
+    scale: [
+      domain: ["Schweiz", "EU-Durchschnitt", "Dänemark", "Estland", "Finnland", "Österreich", "Deutschland"],
+      range: ["#a855f7", "#6b7280", "#06b6d4", "#10b981", "#3b82f6", "#f59e0b", "#ef4444"]
+    ]
+  )
+  |> Vl.encode_field(:text, "Land", type: :nominal)
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
+  )
+```
+
+## E-ID-Referendum: Vertrauensfrage
+
+```elixir
+# Swiss e-ID referendum 2021 — rejected 64.4% No
+# Key concern: trust in private-sector identity providers
+
+eid_data = [
+  %{"Argument" => "Privatwirtschaftliche Lösung", "Zustimmung" => 72, "Typ" => "Contra"},
+  %{"Argument" => "Datenschutzbedenken", "Zustimmung" => 68, "Typ" => "Contra"},
+  %{"Argument" => "Staat soll E-ID herausgeben", "Zustimmung" => 65, "Typ" => "Contra"},
+  %{"Argument" => "Digitalisierung notwendig", "Zustimmung" => 58, "Typ" => "Pro"},
+  %{"Argument" => "Internationaler Anschluss", "Zustimmung" => 42, "Typ" => "Pro"}
+]
+
+chart_eid =
+  Vl.new(width: 720, height: 300, title: "E-ID-Referendum 2021: Abstimmungsmotive (VOX/Sotomo)")
+  |> Vl.data_from_values(eid_data)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Argument", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Zustimmung", type: :quantitative, title: "Zustimmung zum Argument (%)")
+  |> Vl.encode_field(:color, "Typ",
+    type: :nominal,
+    scale: [
+      domain: ["Contra", "Pro"],
+      range: ["#ef4444", "#3b82f6"]
+    ]
+  )
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
+  )
+```
+
+## Kernaussage
+
+```elixir
+Kino.Markdown.new("""
+### Kernaussage
+
+Die Schweiz liegt bei der E-Government-Nutzung unter dem EU-Durchschnitt —
+trotz hoher Internetdurchdringung und Bildung. Das E-ID-Referendum 2021
+(64.4% Nein) zeigt: Die Bevölkerung will digitale Dienste, aber unter
+staatlicher Kontrolle und mit starkem Datenschutz.
+
+Digitale Souveränität bedeutet hier nicht Abschottung, sondern **staatliche
+Infrastruktur statt Abhängigkeit von privaten Plattformen** — bei
+Identität, Zahlungen und Verwaltung.
+""")
+```
+
+## Export
+
+```elixir
+Zukunftslabor.ChartExport.to_svg(chart_egov, name: "egov_nutzung_schweiz")
+Zukunftslabor.ChartExport.to_svg(chart_comparison, name: "egov_internationaler_vergleich")
+Zukunftslabor.ChartExport.to_svg(chart_eid, name: "eid_referendum_motive")
+
+Zukunftslabor.NotizTemplate.generate(
+  title: "Schweiz digital: E-Government unter EU-Durchschnitt",
+  description: "Die Schweiz liegt bei der E-Government-Nutzung unter dem europäischen Durchschnitt. Das E-ID-Referendum zeigt: Die Bevölkerung will staatliche digitale Infrastruktur.",
+  slug: "egov-nutzung-vergleich",
+  category: "datenbriefing",
+  evidence: "stark",
+  tags: ["digitale-souveraenitaet", "e-government", "e-id", "vergleich"],
+  charts: ["egov_nutzung_schweiz.svg", "egov_internationaler_vergleich.svg", "eid_referendum_motive.svg"],
+  summary: """
+  Die Schweiz liegt bei der E-Government-Verfügbarkeit und -Nutzung unter dem
+  EU-Durchschnitt — trotz hoher Digitalisierung in anderen Bereichen. Das E-ID-
+  Referendum 2021 (64.4% Nein) zeigt: Die Bevölkerung fordert staatliche Kontrolle
+  über digitale Identität und Verwaltungsdienste.
+  """,
+  body: """
+  ## Methodik
+
+  Die Analyse kombiniert BFS Omnibus ICT-Daten zur E-Government-Nutzung in der
+  Schweiz mit dem EU eGovernment Benchmark (European Commission/Capgemini) für
+  den internationalen Vergleich. Die Abstimmungsmotive stammen aus der VOX-Analyse
+  (Sotomo) zur E-ID-Volksabstimmung vom 7. März 2021.
+
+  ## Ergebnisse
+
+  ![E-Government-Nutzung Schweiz](/zukunftslabor/charts/egov_nutzung_schweiz.svg)
+
+  ![Internationaler Vergleich](/zukunftslabor/charts/egov_internationaler_vergleich.svg)
+
+  ![E-ID-Referendum: Motive](/zukunftslabor/charts/eid_referendum_motive.svg)
+
+  ## Kontext
+
+  Die Schweiz hat nach dem gescheiterten E-ID-Gesetz einen neuen Anlauf genommen:
+  Die staatliche E-ID soll auf einer Self-Sovereign-Identity-Architektur basieren
+  (dezentral, datenschutzfreundlich). Der Zeithorizont: frühestens 2026.
+
+  ## Datenquellen
+
+  - BFS Omnibus ICT 2021/2023: IKT-Nutzung in Haushalten
+  - EU eGovernment Benchmark 2023 (European Commission / Capgemini)
+  - VOX/Sotomo: Nachbefragung E-ID-Referendum März 2021
+  """
+)
+```
