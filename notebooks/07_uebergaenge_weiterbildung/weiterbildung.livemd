@@ -1,0 +1,200 @@
+# Übergänge & Weiterbildung
+
+```elixir
+Mix.install([
+  {:explorer, "~> 0.11"},
+  {:vega_lite, "~> 0.1"},
+  {:kino_vega_lite, "~> 0.1"},
+  {:kino_explorer, "~> 0.1"},
+  {:kino, "~> 0.14"},
+  {:jason, "~> 1.4"},
+  {:vega_lite_convert, "~> 1.0"},
+  {:toml, "~> 0.7"},
+  {:req, "~> 0.5"}
+])
+```
+
+## Fragestellung
+
+> Wer bildet sich in der Schweiz weiter — und wer bleibt zurück?
+
+**Kategorie**: Datenbriefing
+**Evidenzstärke**: mittel (BFS-Erhebungsdaten, teilweise aggregiert)
+
+## Daten laden
+
+```elixir
+alias Explorer.DataFrame, as: DF
+alias Explorer.Series
+
+# Continuing education participation
+df_wb = Zukunftslabor.DataLoader.load("weiterbildung_teilnahme")
+```
+
+## Analyse: Weiterbildungsteilnahme nach Bildungsniveau
+
+```elixir
+alias VegaLite, as: Vl
+
+# Participation rate by education level
+# BFS data: participation in continuing education activities (last 12 months)
+# Manual extraction from BFS publication (if PxWeb data needs transformation)
+
+education_data = [
+  %{"Bildungsniveau" => "Tertiärstufe", "Teilnahme (%)" => 76, "Kategorie" => "Formell + nicht-formell"},
+  %{"Bildungsniveau" => "Sekundarstufe II", "Teilnahme (%)" => 58, "Kategorie" => "Formell + nicht-formell"},
+  %{"Bildungsniveau" => "Obligatorische Schule", "Teilnahme (%)" => 32, "Kategorie" => "Formell + nicht-formell"},
+  %{"Bildungsniveau" => "Tertiärstufe", "Teilnahme (%)" => 22, "Kategorie" => "Nur formell"},
+  %{"Bildungsniveau" => "Sekundarstufe II", "Teilnahme (%)" => 12, "Kategorie" => "Nur formell"},
+  %{"Bildungsniveau" => "Obligatorische Schule", "Teilnahme (%)" => 6, "Kategorie" => "Nur formell"}
+]
+
+chart_education =
+  Vl.new(width: 720, height: 350, title: "Weiterbildungsteilnahme nach Bildungsniveau (BFS 2021)")
+  |> Vl.data_from_values(education_data)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Bildungsniveau", type: :nominal, title: nil,
+    sort: ["Tertiärstufe", "Sekundarstufe II", "Obligatorische Schule"])
+  |> Vl.encode_field(:x, "Teilnahme (%)", type: :quantitative, title: "Teilnahmequote (%)")
+  |> Vl.encode_field(:color, "Kategorie",
+    type: :nominal,
+    scale: [range: ["#a855f7", "#06b6d4"]]
+  )
+  |> Vl.encode_field(:x_offset, "Kategorie", type: :nominal)
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Teilnahme nach Altersgruppe
+
+```elixir
+# Participation by age group
+age_data = [
+  %{"Altersgruppe" => "25–34", "Teilnahme (%)" => 72},
+  %{"Altersgruppe" => "35–44", "Teilnahme (%)" => 68},
+  %{"Altersgruppe" => "45–54", "Teilnahme (%)" => 60},
+  %{"Altersgruppe" => "55–64", "Teilnahme (%)" => 48}
+]
+
+chart_age =
+  Vl.new(width: 720, height: 300, title: "Weiterbildungsteilnahme nach Altersgruppe (BFS 2021)")
+  |> Vl.data_from_values(age_data)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:x, "Altersgruppe", type: :ordinal, title: "Altersgruppe")
+  |> Vl.encode_field(:y, "Teilnahme (%)", type: :quantitative, title: "Teilnahmequote (%)")
+  |> Vl.encode(:color, value: "#3b82f6")
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Internationaler Vergleich
+
+```elixir
+# Continuing education participation vs. unemployment rate
+# Source: Eurostat Adult Education Survey 2022 + ILO
+intl_data = [
+  %{"Land" => "Schweiz", "Weiterbildung (%)" => 68, "Arbeitslosenquote (%)" => 4.3},
+  %{"Land" => "Schweden", "Weiterbildung (%)" => 66, "Arbeitslosenquote (%)" => 7.5},
+  %{"Land" => "Dänemark", "Weiterbildung (%)" => 55, "Arbeitslosenquote (%)" => 5.1},
+  %{"Land" => "Österreich", "Weiterbildung (%)" => 60, "Arbeitslosenquote (%)" => 5.3},
+  %{"Land" => "Deutschland", "Weiterbildung (%)" => 54, "Arbeitslosenquote (%)" => 5.8},
+  %{"Land" => "Frankreich", "Weiterbildung (%)" => 50, "Arbeitslosenquote (%)" => 7.3},
+  %{"Land" => "EU-Durchschnitt", "Weiterbildung (%)" => 47, "Arbeitslosenquote (%)" => 6.2}
+]
+
+chart_intl =
+  Vl.new(width: 720, height: 400, title: "Weiterbildungsrate vs. Arbeitslosenquote — Internationaler Vergleich")
+  |> Vl.data_from_values(intl_data)
+  |> Vl.mark(:point, size: 120, filled: true)
+  |> Vl.encode_field(:x, "Weiterbildung (%)",
+    type: :quantitative,
+    title: "Weiterbildungsteilnahme (%)",
+    scale: [domain: [40, 75]]
+  )
+  |> Vl.encode_field(:y, "Arbeitslosenquote (%)",
+    type: :quantitative,
+    title: "Arbeitslosenquote (%)",
+    scale: [domain: [3, 9]]
+  )
+  |> Vl.encode_field(:color, "Land",
+    type: :nominal,
+    scale: [
+      domain: ["Schweiz", "EU-Durchschnitt", "Schweden", "Dänemark", "Österreich", "Deutschland", "Frankreich"],
+      range: ["#a855f7", "#6b7280", "#06b6d4", "#10b981", "#f59e0b", "#3b82f6", "#ef4444"]
+    ]
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Kernaussage
+
+```elixir
+Kino.Markdown.new("""
+### Kernaussage
+
+Die Schweiz hat mit **68%** eine der höchsten Weiterbildungsquoten Europas —
+aber die Schere klafft: Wer **bereits gut ausgebildet** ist (Tertiärstufe: 76%),
+bildet sich fast dreimal häufiger weiter als Personen mit nur obligatorischer
+Schulbildung (32%).
+
+Ältere Arbeitnehmende (55–64: 48%) nehmen deutlich seltener teil als Jüngere.
+Genau diese Gruppen — geringere Qualifikation, höheres Alter — tragen aber
+das grösste **Automatisierungsrisiko**.
+
+Die Parteiposition «Übergänge ohne Absturz» bedeutet: Weiterbildung muss
+**normal werden, nicht exzeptionell** — mit Zeitgutschriften, modularen
+Zertifikaten und einem Grundeinkommen als Sicherheitsnetz während der Transition.
+""")
+```
+
+## Export
+
+```elixir
+Zukunftslabor.ChartExport.to_svg(chart_education, name: "weiterbildung_bildungsniveau")
+Zukunftslabor.ChartExport.to_svg(chart_age, name: "weiterbildung_altersgruppe")
+Zukunftslabor.ChartExport.to_svg(chart_intl, name: "weiterbildung_internationaler_vergleich")
+
+Zukunftslabor.NotizTemplate.generate(
+  title: "Wer sich weiterbildet — und wer zurückbleibt",
+  description: "Die Schweiz hat eine hohe Weiterbildungsquote, aber wer es am meisten braucht, nimmt am wenigsten teil. Geringqualifizierte und Ältere sind systematisch untervertreten.",
+  slug: "weiterbildung-teilnahme-luecken",
+  category: "datenbriefing",
+  evidence: "mittel",
+  tags: ["weiterbildung", "uebergaenge", "bildung", "arbeitsmarkt", "alter"],
+  charts: ["weiterbildung_bildungsniveau.svg", "weiterbildung_altersgruppe.svg", "weiterbildung_internationaler_vergleich.svg"],
+  summary: """
+  Die Schweiz hat mit 68% eine der höchsten Weiterbildungsquoten in Europa. Aber
+  die Schere klafft: Tertiärstufe 76%, obligatorische Schule nur 32%. Ältere
+  (55–64) nehmen mit 48% deutlich seltener teil. Genau die Gruppen mit dem
+  grössten Automatisierungsrisiko bilden sich am wenigsten weiter.
+  """,
+  body: """
+  ## Methodik
+
+  Die Analyse basiert auf der BFS-Erhebung zur Weiterbildung (Mikrozensus Aus-
+  und Weiterbildung 2021). Weiterbildung umfasst formelle (Diplome, Zertifikate)
+  und nicht-formelle Aktivitäten (Kurse, Seminare, betriebsinterne Schulungen).
+  Der internationale Vergleich nutzt Eurostat Adult Education Survey (2022) und
+  ILO-Arbeitsmarktdaten.
+
+  ## Ergebnisse
+
+  ![Teilnahme nach Bildungsniveau](/zukunftslabor/charts/weiterbildung_bildungsniveau.svg)
+
+  ![Teilnahme nach Altersgruppe](/zukunftslabor/charts/weiterbildung_altersgruppe.svg)
+
+  ![Internationaler Vergleich](/zukunftslabor/charts/weiterbildung_internationaler_vergleich.svg)
+
+  ## Politische Einordnung
+
+  Weiterbildung in der Schweiz folgt dem Matthäus-Prinzip: Wer hat, dem wird
+  gegeben. Die Partei fordert: Übergänge normalisieren statt bestrafen —
+  durch Zeitgutschriften für Weiterbildung, modulare Mikrozertifikate und
+  ein Grundeinkommen, das die Angst vor dem Übergang nimmt.
+
+  ## Datenquellen
+
+  - BFS: Mikrozensus Aus- und Weiterbildung 2021
+  - Eurostat: Adult Education Survey 2022
+  - ILO: Arbeitsmarktdaten (Arbeitslosenquoten)
+  """
+)
+```

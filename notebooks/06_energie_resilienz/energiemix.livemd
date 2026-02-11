@@ -1,0 +1,197 @@
+# Energie & Resilienz
+
+```elixir
+Mix.install([
+  {:explorer, "~> 0.11"},
+  {:vega_lite, "~> 0.1"},
+  {:kino_vega_lite, "~> 0.1"},
+  {:kino_explorer, "~> 0.1"},
+  {:kino, "~> 0.14"},
+  {:jason, "~> 1.4"},
+  {:vega_lite_convert, "~> 1.0"},
+  {:toml, "~> 0.7"},
+  {:req, "~> 0.5"}
+])
+```
+
+## Fragestellung
+
+> Wie resilient ist die Schweizer Stromversorgung — und wo liegen die Abhängigkeiten?
+
+**Kategorie**: Datenbriefing
+**Evidenzstärke**: stark (amtliche BFS/BFE-Elektrizitätsstatistik)
+
+## Daten laden
+
+```elixir
+alias Explorer.DataFrame, as: DF
+alias Explorer.Series
+
+# Electricity production by source
+df_elec = Zukunftslabor.DataLoader.load("elektrizitaet_produktion")
+```
+
+## Analyse: Schweizer Strommix
+
+```elixir
+alias VegaLite, as: Vl
+
+# Stacked bar — electricity mix over time
+# Group by year and energy source
+elec_data =
+  df_elec
+  |> DF.to_rows()
+  |> Enum.map(fn row ->
+    %{
+      "Jahr" => row["Jahr"],
+      "Energieträger" => row["Energieträger"],
+      "Produktion" => row["value"]
+    }
+  end)
+  |> Enum.filter(& &1["Produktion"] && &1["Produktion"] > 0)
+
+chart_mix =
+  Vl.new(width: 720, height: 400, title: "Schweizer Elektrizitätsproduktion nach Energieträger")
+  |> Vl.data_from_values(elec_data)
+  |> Vl.mark(:bar)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "Produktion", type: :quantitative, title: "GWh", stack: :zero)
+  |> Vl.encode_field(:color, "Energieträger",
+    type: :nominal,
+    scale: [range: ["#3b82f6", "#a855f7", "#f59e0b", "#06b6d4", "#10b981", "#6b7280"]]
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Internationaler Vergleich: Erneuerbarer Strom
+
+```elixir
+# Renewable electricity share — international comparison
+# Source: IEA/Eurostat 2023
+renewable_data = [
+  %{"Land" => "Schweiz", "Erneuerbarer Anteil (%)" => 76},
+  %{"Land" => "Schweden", "Erneuerbarer Anteil (%)" => 68},
+  %{"Land" => "Dänemark", "Erneuerbarer Anteil (%)" => 84},
+  %{"Land" => "Österreich", "Erneuerbarer Anteil (%)" => 78},
+  %{"Land" => "Deutschland", "Erneuerbarer Anteil (%)" => 52},
+  %{"Land" => "Frankreich", "Erneuerbarer Anteil (%)" => 27},
+  %{"Land" => "EU-Durchschnitt", "Erneuerbarer Anteil (%)" => 44}
+]
+
+chart_renewable =
+  Vl.new(width: 720, height: 350, title: "Erneuerbarer Stromanteil im Vergleich (2023)")
+  |> Vl.data_from_values(renewable_data)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Land", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Erneuerbarer Anteil (%)", type: :quantitative, title: "Anteil (%)")
+  |> Vl.encode_field(:color, "Land",
+    type: :nominal,
+    scale: [
+      domain: ["Schweiz", "EU-Durchschnitt", "Dänemark", "Österreich", "Schweden", "Deutschland", "Frankreich"],
+      range: ["#a855f7", "#6b7280", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#3b82f6"]
+    ],
+    legend: nil
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Netto-Stromimporte/-exporte
+
+```elixir
+# Switzerland is a net importer in winter, net exporter in summer
+# Manual data: net imports by year (positive = import, negative = export)
+# Source: BFE Elektrizitätsstatistik
+import_data = [
+  %{"Jahr" => 2015, "Netto-Import (GWh)" => 1_200},
+  %{"Jahr" => 2016, "Netto-Import (GWh)" => -2_100},
+  %{"Jahr" => 2017, "Netto-Import (GWh)" => -3_400},
+  %{"Jahr" => 2018, "Netto-Import (GWh)" => -1_800},
+  %{"Jahr" => 2019, "Netto-Import (GWh)" => -5_700},
+  %{"Jahr" => 2020, "Netto-Import (GWh)" => -5_600},
+  %{"Jahr" => 2021, "Netto-Import (GWh)" => 2_600},
+  %{"Jahr" => 2022, "Netto-Import (GWh)" => 3_500},
+  %{"Jahr" => 2023, "Netto-Import (GWh)" => -6_400}
+]
+
+chart_imports =
+  Vl.new(width: 720, height: 300, title: "Netto-Stromimporte der Schweiz (positiv = Import, negativ = Export)")
+  |> Vl.data_from_values(import_data)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "Netto-Import (GWh)", type: :quantitative, title: "GWh")
+  |> Vl.encode(:color,
+    condition: [test: "datum['Netto-Import (GWh)'] > 0", value: "#ef4444"],
+    value: "#10b981"
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Kernaussage
+
+```elixir
+Kino.Markdown.new("""
+### Kernaussage
+
+Die Schweiz produziert rund **98% CO₂-armen Strom** (Wasserkraft + Kernkraft).
+Das ist eine enorme Stärke — aber die **saisonale Abhängigkeit** (Winterimporte)
+und die **Konzentration auf Wasserkraft** (~57%) schaffen Verwundbarkeiten.
+
+Die Frage ist nicht «erneuerbar ja/nein» — sie ist längst beantwortet. Die
+Frage ist: **Wie wird die Versorgung resilient**, wenn Trockenheit die
+Wasserkraft schwächt und Kernkraftwerke vom Netz gehen?
+
+Resilienz ist Ingenieurwesen, nicht Ideologie.
+""")
+```
+
+## Export
+
+```elixir
+Zukunftslabor.ChartExport.to_svg(chart_mix, name: "energiemix_strommix")
+Zukunftslabor.ChartExport.to_svg(chart_renewable, name: "energiemix_erneuerbar_vergleich")
+Zukunftslabor.ChartExport.to_svg(chart_imports, name: "energiemix_netto_importe")
+
+Zukunftslabor.NotizTemplate.generate(
+  title: "98% CO₂-arm — aber wie resilient ist die Schweizer Stromversorgung?",
+  description: "Die Schweiz hat einen der saubersten Strommixe Europas, doch saisonale Importabhängigkeit und Wasserkraft-Konzentration schaffen Verwundbarkeiten.",
+  slug: "energiemix-resilienz",
+  category: "datenbriefing",
+  evidence: "stark",
+  tags: ["energie", "resilienz", "strom", "infrastruktur", "vergleich"],
+  charts: ["energiemix_strommix.svg", "energiemix_erneuerbar_vergleich.svg", "energiemix_netto_importe.svg"],
+  summary: """
+  Die Schweiz produziert 98% ihres Stroms CO₂-arm (Wasser + Kernkraft) und liegt
+  mit 76% erneuerbarem Anteil weit über dem EU-Durchschnitt (44%). Aber die
+  Winterlücke (Netto-Importe bis 3.5 TWh) und die Wasserkraft-Dominanz
+  machen das System verwundbar — besonders bei Trockenheit und AKW-Abschaltungen.
+  """,
+  body: """
+  ## Methodik
+
+  Die Analyse kombiniert BFS/BFE-Elektrizitätsstatistik (Produktion nach Energieträger)
+  mit IEA/Eurostat-Daten für den internationalen Vergleich. Die Netto-Importdaten
+  stammen aus der BFE-Elektrizitätsstatistik (physische Stromflüsse an den Grenzen).
+
+  ## Ergebnisse
+
+  ![Strommix](/zukunftslabor/charts/energiemix_strommix.svg)
+
+  ![Erneuerbarer Anteil im Vergleich](/zukunftslabor/charts/energiemix_erneuerbar_vergleich.svg)
+
+  ![Netto-Stromimporte](/zukunftslabor/charts/energiemix_netto_importe.svg)
+
+  ## Politische Einordnung
+
+  Die Partei-Position ist klar: Resilienz durch Diversifikation (Solar, Wind,
+  Speicher), nicht durch Festhalten an einzelnen Technologien. Die Winterlücke
+  erfordert Speicherlösungen (Pumpspeicher, Batterien, Power-to-X) und robuste
+  europäische Vernetzung — nicht autarkische Fantasien.
+
+  ## Datenquellen
+
+  - BFS/BFE: Schweizerische Elektrizitätsstatistik (Produktion nach Energieträger)
+  - BFE: Schweizerische Gesamtenergiestatistik (Import/Export)
+  - IEA / Eurostat: Renewable electricity share by country (2023)
+  """
+)
+```

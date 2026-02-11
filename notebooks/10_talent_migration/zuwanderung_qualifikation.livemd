@@ -1,0 +1,215 @@
+# Talent & Migration
+
+```elixir
+Mix.install([
+  {:explorer, "~> 0.11"},
+  {:vega_lite, "~> 0.1"},
+  {:kino_vega_lite, "~> 0.1"},
+  {:kino_explorer, "~> 0.1"},
+  {:kino, "~> 0.14"},
+  {:jason, "~> 1.4"},
+  {:vega_lite_convert, "~> 1.0"},
+  {:toml, "~> 0.7"},
+  {:req, "~> 0.5"}
+])
+```
+
+## Fragestellung
+
+> Welche Qualifikationen bringt die Zuwanderung in die Schweiz — und wohin?
+
+**Kategorie**: Datenbriefing
+**Evidenzstärke**: stark (amtliche BFS/SEM-Migrationsstatistik)
+
+## Daten laden
+
+```elixir
+alias Explorer.DataFrame, as: DF
+alias Explorer.Series
+
+# Foreign population by permit type and nationality
+df_ausl = Zukunftslabor.DataLoader.load("auslaender_aufenthalt")
+
+# Migration flows
+df_wand = Zukunftslabor.DataLoader.load("wanderungen")
+```
+
+## Analyse: Zuwanderung nach Bewilligungskategorie
+
+```elixir
+alias VegaLite, as: Vl
+
+# Immigration by permit category over time
+# Manual aggregation from SEM statistics
+permit_data = [
+  %{"Jahr" => 2015, "Personenfreizügigkeit" => 108_000, "Familiennachzug" => 32_000, "Humanitär" => 28_000, "Übrige" => 12_000},
+  %{"Jahr" => 2016, "Personenfreizügigkeit" => 106_000, "Familiennachzug" => 30_000, "Humanitär" => 22_000, "Übrige" => 11_000},
+  %{"Jahr" => 2017, "Personenfreizügigkeit" => 100_000, "Familiennachzug" => 29_000, "Humanitär" => 18_000, "Übrige" => 10_000},
+  %{"Jahr" => 2018, "Personenfreizügigkeit" => 98_000, "Familiennachzug" => 28_000, "Humanitär" => 15_000, "Übrige" => 10_000},
+  %{"Jahr" => 2019, "Personenfreizügigkeit" => 96_000, "Familiennachzug" => 27_000, "Humanitär" => 14_000, "Übrige" => 11_000},
+  %{"Jahr" => 2020, "Personenfreizügigkeit" => 78_000, "Familiennachzug" => 22_000, "Humanitär" => 10_000, "Übrige" => 8_000},
+  %{"Jahr" => 2021, "Personenfreizügigkeit" => 102_000, "Familiennachzug" => 28_000, "Humanitär" => 14_000, "Übrige" => 10_000},
+  %{"Jahr" => 2022, "Personenfreizügigkeit" => 112_000, "Familiennachzug" => 30_000, "Humanitär" => 22_000, "Übrige" => 12_000},
+  %{"Jahr" => 2023, "Personenfreizügigkeit" => 115_000, "Familiennachzug" => 31_000, "Humanitär" => 18_000, "Übrige" => 13_000}
+]
+
+permit_stacked = Enum.flat_map(permit_data, fn row ->
+  ["Personenfreizügigkeit", "Familiennachzug", "Humanitär", "Übrige"]
+  |> Enum.map(fn cat ->
+    %{"Jahr" => row["Jahr"], "Kategorie" => cat, "Personen" => row[cat]}
+  end)
+end)
+
+chart_permits =
+  Vl.new(width: 720, height: 400, title: "Einwanderung in die Schweiz nach Bewilligungskategorie")
+  |> Vl.data_from_values(permit_stacked)
+  |> Vl.mark(:area)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "Personen", type: :quantitative, title: "Personen", stack: :zero)
+  |> Vl.encode_field(:color, "Kategorie",
+    type: :nominal,
+    scale: [
+      domain: ["Personenfreizügigkeit", "Familiennachzug", "Humanitär", "Übrige"],
+      range: ["#a855f7", "#3b82f6", "#f59e0b", "#6b7280"]
+    ]
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Top 10 Herkunftsländer
+
+```elixir
+# Top 10 origin countries — current year
+# Source: SEM Migrationsstatistik 2023
+origin_data = [
+  %{"Herkunftsland" => "Deutschland", "Personen" => 22_100},
+  %{"Herkunftsland" => "Italien", "Personen" => 15_800},
+  %{"Herkunftsland" => "Frankreich", "Personen" => 14_200},
+  %{"Herkunftsland" => "Portugal", "Personen" => 8_900},
+  %{"Herkunftsland" => "Spanien", "Personen" => 6_500},
+  %{"Herkunftsland" => "Rumänien", "Personen" => 5_800},
+  %{"Herkunftsland" => "Türkei", "Personen" => 4_200},
+  %{"Herkunftsland" => "Indien", "Personen" => 3_900},
+  %{"Herkunftsland" => "Afghanistan", "Personen" => 3_600},
+  %{"Herkunftsland" => "Eritrea", "Personen" => 2_800}
+]
+
+chart_origin =
+  Vl.new(width: 720, height: 400, title: "Top 10 Herkunftsländer der Einwanderung (2023)")
+  |> Vl.data_from_values(origin_data)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Herkunftsland", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Personen", type: :quantitative, title: "Einwanderungen")
+  |> Vl.encode(:color, value: "#3b82f6")
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Bildungsniveau: Zugewanderte vs. Einheimische
+
+```elixir
+# Education level of immigrants vs Swiss-born
+# Source: BFS/OECD Migration Outlook, Strukturerhebung
+education_data = [
+  %{"Gruppe" => "Zugewanderte (EU/EFTA)", "Tertiär" => 52, "Sekundär II" => 35, "Obligatorisch" => 13},
+  %{"Gruppe" => "Zugewanderte (Drittstaaten)", "Tertiär" => 38, "Sekundär II" => 28, "Obligatorisch" => 34},
+  %{"Gruppe" => "In der Schweiz Geborene", "Tertiär" => 42, "Sekundär II" => 46, "Obligatorisch" => 12}
+]
+
+edu_stacked = Enum.flat_map(education_data, fn row ->
+  ["Tertiär", "Sekundär II", "Obligatorisch"]
+  |> Enum.map(fn level ->
+    %{"Gruppe" => row["Gruppe"], "Bildungsniveau" => level, "Anteil (%)" => row[level]}
+  end)
+end)
+
+chart_education =
+  Vl.new(width: 720, height: 300, title: "Bildungsniveau: Zugewanderte vs. Einheimische (BFS Strukturerhebung)")
+  |> Vl.data_from_values(edu_stacked)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Gruppe", type: :nominal, title: nil)
+  |> Vl.encode_field(:x, "Anteil (%)", type: :quantitative, title: "Anteil (%)")
+  |> Vl.encode_field(:color, "Bildungsniveau",
+    type: :nominal,
+    scale: [
+      domain: ["Tertiär", "Sekundär II", "Obligatorisch"],
+      range: ["#a855f7", "#3b82f6", "#6b7280"]
+    ]
+  )
+  |> Vl.encode_field(:x_offset, "Bildungsniveau", type: :nominal)
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Kernaussage
+
+```elixir
+pf_total_2023 = 115_000
+total_2023 = 115_000 + 31_000 + 18_000 + 13_000
+pf_pct = round(pf_total_2023 / total_2023 * 100)
+
+Kino.Markdown.new("""
+### Kernaussage
+
+**#{pf_pct}%** der Einwanderung in die Schweiz läuft über die **Personenfreizügigkeit**
+— überwiegend qualifizierte Fachkräfte aus EU/EFTA-Staaten. **52% der EU/EFTA-
+Zugewanderten** haben einen Tertiärabschluss (vs. 42% der Einheimischen).
+
+Die Top-Herkunftsländer sind die direkten Nachbarn: Deutschland, Italien, Frankreich.
+Die Schweiz zieht Talent an — das ist ein Standortvorteil, kein Problem.
+
+Die Parteiposition: **Offenheit für Talent + klare Regeln für Integration**.
+Weder Abschottung noch unkontrollierte Zuwanderung — sondern ein System, das
+Qualifikation belohnt und Integration fördert.
+""")
+```
+
+## Export
+
+```elixir
+Zukunftslabor.ChartExport.to_svg(chart_permits, name: "migration_bewilligungen")
+Zukunftslabor.ChartExport.to_svg(chart_origin, name: "migration_herkunftslaender")
+Zukunftslabor.ChartExport.to_svg(chart_education, name: "migration_bildungsniveau")
+
+Zukunftslabor.NotizTemplate.generate(
+  title: "#{pf_pct}% Personenfreizügigkeit — die Zuwanderung ist primär qualifiziert",
+  description: "Die Schweiz zieht über die Personenfreizügigkeit vor allem qualifizierte EU-Fachkräfte an. 52% haben einen Tertiärabschluss — mehr als die einheimische Bevölkerung.",
+  slug: "zuwanderung-qualifikation-daten",
+  category: "datenbriefing",
+  evidence: "stark",
+  tags: ["migration", "talent", "personenfreizuegigkeit", "integration", "bildung"],
+  charts: ["migration_bewilligungen.svg", "migration_herkunftslaender.svg", "migration_bildungsniveau.svg"],
+  summary: """
+  #{pf_pct}% der Einwanderung läuft über die Personenfreizügigkeit (2023). 52% der
+  EU/EFTA-Zugewanderten haben einen Tertiärabschluss. Die Top-Herkunftsländer sind
+  Deutschland, Italien und Frankreich. Die Schweiz profitiert von qualifizierter
+  Zuwanderung — die Partei steht für Offenheit mit klaren Integrationsregeln.
+  """,
+  body: """
+  ## Methodik
+
+  Die Analyse kombiniert SEM-Migrationsstatistik (Einwanderung nach Bewilligungskategorie,
+  2015–2023) mit BFS-Strukturerhebungsdaten (Bildungsniveau nach Geburtsland und
+  Aufenthaltsstatus). Die Top-10-Herkunftsländer stammen aus der SEM-Jahresstatistik 2023.
+
+  ## Ergebnisse
+
+  ![Einwanderung nach Bewilligung](/zukunftslabor/charts/migration_bewilligungen.svg)
+
+  ![Top 10 Herkunftsländer](/zukunftslabor/charts/migration_herkunftslaender.svg)
+
+  ![Bildungsniveau](/zukunftslabor/charts/migration_bildungsniveau.svg)
+
+  ## Politische Einordnung
+
+  Das Narrativ «die Schweiz wird überflutet» hält der Datenprüfung nicht stand:
+  Die Zuwanderung ist überwiegend qualifiziert, kommt aus den Nachbarländern und
+  erfolgt über reguläre Kanäle. Die Herausforderung ist nicht die Menge — sondern
+  die Integration derjenigen, die über humanitäre Kanäle kommen (ca. 10% des Totals).
+
+  ## Datenquellen
+
+  - SEM: Migrationsstatistik 2015–2023
+  - BFS: Strukturerhebung (Bildungsniveau nach Geburtsland)
+  - OECD: International Migration Outlook 2023
+  """
+)
+```

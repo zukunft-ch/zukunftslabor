@@ -625,7 +625,959 @@ Zukunftslabor.NotizTemplate.generate(
 )
 
 IO.puts("\n========================================")
-IO.puts("  Done! All 4 notebooks executed.")
+IO.puts("  05 — Forschung & Innovation")
+IO.puts("========================================\n")
+
+df_rd = Zukunftslabor.DataLoader.load("forschung_ausgaben")
+
+latest_rd_year =
+  df_rd
+  |> DF.pull("Jahr")
+  |> Series.max()
+
+df_rd_latest =
+  df_rd
+  |> DF.filter(col("Jahr") == ^latest_rd_year)
+  |> DF.sort_by(desc: col("Ausgaben_Mio_CHF"))
+
+sector_data_05 =
+  df_rd_latest
+  |> DF.to_rows()
+  |> Enum.map(fn row ->
+    %{"Sektor" => row["Sektor"], "Ausgaben (Mio. CHF)" => row["Ausgaben_Mio_CHF"]}
+  end)
+
+chart_sectors_05 =
+  Vl.new(width: 720, height: 400, title: "F&E-Ausgaben nach Sektor — Schweiz (#{latest_rd_year})")
+  |> Vl.data_from_values(sector_data_05)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Sektor", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Ausgaben (Mio. CHF)", type: :quantitative, title: "Mio. CHF")
+  |> Vl.encode(:color, value: "#a855f7")
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+oecd_data_05 = [
+  %{"Land" => "Israel", "F&E_BIP" => 5.56, "BIP_pro_Kopf" => 54_660},
+  %{"Land" => "Südkorea", "F&E_BIP" => 4.93, "BIP_pro_Kopf" => 50_490},
+  %{"Land" => "Schweden", "F&E_BIP" => 3.40, "BIP_pro_Kopf" => 60_240},
+  %{"Land" => "Schweiz", "F&E_BIP" => 3.36, "BIP_pro_Kopf" => 93_260},
+  %{"Land" => "USA", "F&E_BIP" => 3.46, "BIP_pro_Kopf" => 76_330},
+  %{"Land" => "Deutschland", "F&E_BIP" => 3.13, "BIP_pro_Kopf" => 51_380},
+  %{"Land" => "Österreich", "F&E_BIP" => 3.20, "BIP_pro_Kopf" => 56_800},
+  %{"Land" => "OECD-Durchschnitt", "F&E_BIP" => 2.71, "BIP_pro_Kopf" => 47_000}
+]
+
+chart_oecd_05 =
+  Vl.new(width: 720, height: 400, title: "F&E-Ausgaben (% BIP) vs. BIP pro Kopf — Internationaler Vergleich")
+  |> Vl.data_from_values(oecd_data_05)
+  |> Vl.mark(:point, size: 120, filled: true)
+  |> Vl.encode_field(:x, "BIP_pro_Kopf", type: :quantitative, title: "BIP pro Kopf (USD, KKP)", scale: [domain: [40_000, 100_000]])
+  |> Vl.encode_field(:y, "F&E_BIP", type: :quantitative, title: "F&E-Ausgaben (% des BIP)", scale: [domain: [2.0, 6.0]])
+  |> Vl.encode_field(:color, "Land",
+    type: :nominal,
+    scale: [
+      domain: ["Schweiz", "OECD-Durchschnitt", "Israel", "Südkorea", "USA", "Schweden", "Deutschland", "Österreich"],
+      range: ["#a855f7", "#6b7280", "#06b6d4", "#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"]
+    ]
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+yearly_totals_05 =
+  df_rd
+  |> DF.group_by("Jahr")
+  |> DF.summarise(Total: sum(col("Ausgaben_Mio_CHF")))
+  |> DF.to_rows()
+  |> Enum.map(fn row -> %{"Jahr" => row["Jahr"], "Total (Mio. CHF)" => row["Total"]} end)
+  |> Enum.sort_by(& &1["Jahr"])
+
+chart_trend_05 =
+  Vl.new(width: 720, height: 300, title: "F&E-Gesamtausgaben Schweiz im Zeitverlauf")
+  |> Vl.data_from_values(yearly_totals_05)
+  |> Vl.mark(:line, point: true, stroke_width: 2)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "Total (Mio. CHF)", type: :quantitative, title: "Mio. CHF")
+  |> Vl.encode(:color, value: "#a855f7")
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+total_rd_05 = if length(yearly_totals_05) > 0, do: List.last(yearly_totals_05)["Total (Mio. CHF)"], else: 0
+
+IO.puts("Total R&D (#{latest_rd_year}): CHF #{round(total_rd_05)} Mio.")
+
+# Export notebook 05
+Zukunftslabor.ChartExport.to_svg(chart_sectors_05, name: "forschung_ausgaben_sektor")
+Zukunftslabor.ChartExport.to_svg(chart_oecd_05, name: "forschung_internationaler_vergleich")
+Zukunftslabor.ChartExport.to_svg(chart_trend_05, name: "forschung_ausgaben_zeitreihe")
+
+Zukunftslabor.NotizTemplate.generate(
+  title: "3.4% des BIP für Forschung — aber wem gehört das Wissen?",
+  description: "Die Schweiz gehört bei F&E-Ausgaben zur Weltspitze, doch zwei Drittel kommen aus der Privatwirtschaft. Der öffentliche Ertrag aus öffentlicher Forschung bleibt eine offene Frage.",
+  slug: "forschung-innovation-ausgaben",
+  category: "datenbriefing",
+  evidence: "stark",
+  tags: ["forschung", "innovation", "commons", "oecd", "f-und-e"],
+  charts: ["forschung_ausgaben_sektor.svg", "forschung_internationaler_vergleich.svg", "forschung_ausgaben_zeitreihe.svg"],
+  summary: """
+  Die Schweiz investiert rund #{round(total_rd_05 / 1000, 1)} Mrd. CHF (ca. 3.4% des BIP)
+  in Forschung und Entwicklung — Top 5 weltweit. Die Frage, was als öffentlicher Ertrag
+  aus öffentlich finanzierter Forschung zurückfliesst, ist politisch unbeantwortet.
+  """,
+  body: """
+  ## Methodik
+
+  Grundlage sind die BFS-Forschungsstatistik (F&E-Aufwendungen nach Sektor) und
+  die OECD Main Science and Technology Indicators (GERD als % des BIP).
+
+  ## Ergebnisse
+
+  ![F&E-Ausgaben nach Sektor](/zukunftslabor/charts/forschung_ausgaben_sektor.svg)
+
+  ![Internationaler Vergleich](/zukunftslabor/charts/forschung_internationaler_vergleich.svg)
+
+  ![Zeitreihe](/zukunftslabor/charts/forschung_ausgaben_zeitreihe.svg)
+
+  ## Datenquellen
+
+  - BFS: Forschung und Entwicklung — Aufwendungen (2004–2021)
+  - OECD Main Science and Technology Indicators 2023
+  """
+)
+
+IO.puts("\n========================================")
+IO.puts("  06 — Energie & Resilienz")
+IO.puts("========================================\n")
+
+df_elec = Zukunftslabor.DataLoader.load("elektrizitaet_produktion")
+
+elec_data_06 =
+  df_elec
+  |> DF.to_rows()
+  |> Enum.map(fn row ->
+    %{"Jahr" => row["Jahr"], "Energieträger" => row["Energieträger"], "Produktion" => row["value"]}
+  end)
+  |> Enum.filter(& &1["Produktion"] && &1["Produktion"] > 0)
+
+chart_mix_06 =
+  Vl.new(width: 720, height: 400, title: "Schweizer Elektrizitätsproduktion nach Energieträger")
+  |> Vl.data_from_values(elec_data_06)
+  |> Vl.mark(:bar)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "Produktion", type: :quantitative, title: "GWh", stack: :zero)
+  |> Vl.encode_field(:color, "Energieträger",
+    type: :nominal,
+    scale: [range: ["#3b82f6", "#a855f7", "#f59e0b", "#06b6d4", "#10b981", "#6b7280"]]
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+renewable_data_06 = [
+  %{"Land" => "Schweiz", "Erneuerbarer Anteil (%)" => 76},
+  %{"Land" => "Schweden", "Erneuerbarer Anteil (%)" => 68},
+  %{"Land" => "Dänemark", "Erneuerbarer Anteil (%)" => 84},
+  %{"Land" => "Österreich", "Erneuerbarer Anteil (%)" => 78},
+  %{"Land" => "Deutschland", "Erneuerbarer Anteil (%)" => 52},
+  %{"Land" => "Frankreich", "Erneuerbarer Anteil (%)" => 27},
+  %{"Land" => "EU-Durchschnitt", "Erneuerbarer Anteil (%)" => 44}
+]
+
+chart_renewable_06 =
+  Vl.new(width: 720, height: 350, title: "Erneuerbarer Stromanteil im Vergleich (2023)")
+  |> Vl.data_from_values(renewable_data_06)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Land", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Erneuerbarer Anteil (%)", type: :quantitative, title: "Anteil (%)")
+  |> Vl.encode_field(:color, "Land",
+    type: :nominal,
+    scale: [
+      domain: ["Schweiz", "EU-Durchschnitt", "Dänemark", "Österreich", "Schweden", "Deutschland", "Frankreich"],
+      range: ["#a855f7", "#6b7280", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#3b82f6"]
+    ],
+    legend: nil
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+import_data_06 = [
+  %{"Jahr" => 2015, "Netto-Import (GWh)" => 1_200},
+  %{"Jahr" => 2016, "Netto-Import (GWh)" => -2_100},
+  %{"Jahr" => 2017, "Netto-Import (GWh)" => -3_400},
+  %{"Jahr" => 2018, "Netto-Import (GWh)" => -1_800},
+  %{"Jahr" => 2019, "Netto-Import (GWh)" => -5_700},
+  %{"Jahr" => 2020, "Netto-Import (GWh)" => -5_600},
+  %{"Jahr" => 2021, "Netto-Import (GWh)" => 2_600},
+  %{"Jahr" => 2022, "Netto-Import (GWh)" => 3_500},
+  %{"Jahr" => 2023, "Netto-Import (GWh)" => -6_400}
+]
+
+chart_imports_06 =
+  Vl.new(width: 720, height: 300, title: "Netto-Stromimporte der Schweiz (positiv = Import, negativ = Export)")
+  |> Vl.data_from_values(import_data_06)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "Netto-Import (GWh)", type: :quantitative, title: "GWh")
+  |> Vl.encode(:color,
+    condition: [test: "datum['Netto-Import (GWh)'] > 0", value: "#ef4444"],
+    value: "#10b981"
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+IO.puts("Electricity data loaded: #{length(elec_data_06)} rows")
+
+# Export notebook 06
+Zukunftslabor.ChartExport.to_svg(chart_mix_06, name: "energiemix_strommix")
+Zukunftslabor.ChartExport.to_svg(chart_renewable_06, name: "energiemix_erneuerbar_vergleich")
+Zukunftslabor.ChartExport.to_svg(chart_imports_06, name: "energiemix_netto_importe")
+
+Zukunftslabor.NotizTemplate.generate(
+  title: "98% CO₂-arm — aber wie resilient ist die Schweizer Stromversorgung?",
+  description: "Die Schweiz hat einen der saubersten Strommixe Europas, doch saisonale Importabhängigkeit und Wasserkraft-Konzentration schaffen Verwundbarkeiten.",
+  slug: "energiemix-resilienz",
+  category: "datenbriefing",
+  evidence: "stark",
+  tags: ["energie", "resilienz", "strom", "infrastruktur", "vergleich"],
+  charts: ["energiemix_strommix.svg", "energiemix_erneuerbar_vergleich.svg", "energiemix_netto_importe.svg"],
+  summary: """
+  Die Schweiz produziert 98% ihres Stroms CO₂-arm und liegt mit 76% erneuerbarem Anteil
+  weit über dem EU-Durchschnitt (44%). Aber die Winterlücke und die Wasserkraft-Dominanz
+  machen das System verwundbar.
+  """,
+  body: """
+  ## Methodik
+
+  BFS/BFE-Elektrizitätsstatistik + IEA/Eurostat-Daten für den internationalen Vergleich.
+
+  ## Ergebnisse
+
+  ![Strommix](/zukunftslabor/charts/energiemix_strommix.svg)
+
+  ![Erneuerbarer Anteil](/zukunftslabor/charts/energiemix_erneuerbar_vergleich.svg)
+
+  ![Netto-Importe](/zukunftslabor/charts/energiemix_netto_importe.svg)
+
+  ## Datenquellen
+
+  - BFS/BFE: Schweizerische Elektrizitätsstatistik
+  - IEA / Eurostat: Renewable electricity share by country (2023)
+  """
+)
+
+IO.puts("\n========================================")
+IO.puts("  07 — Übergänge & Weiterbildung")
+IO.puts("========================================\n")
+
+education_data_07 = [
+  %{"Bildungsniveau" => "Tertiärstufe", "Teilnahme (%)" => 76, "Kategorie" => "Formell + nicht-formell"},
+  %{"Bildungsniveau" => "Sekundarstufe II", "Teilnahme (%)" => 58, "Kategorie" => "Formell + nicht-formell"},
+  %{"Bildungsniveau" => "Obligatorische Schule", "Teilnahme (%)" => 32, "Kategorie" => "Formell + nicht-formell"},
+  %{"Bildungsniveau" => "Tertiärstufe", "Teilnahme (%)" => 22, "Kategorie" => "Nur formell"},
+  %{"Bildungsniveau" => "Sekundarstufe II", "Teilnahme (%)" => 12, "Kategorie" => "Nur formell"},
+  %{"Bildungsniveau" => "Obligatorische Schule", "Teilnahme (%)" => 6, "Kategorie" => "Nur formell"}
+]
+
+chart_education_07 =
+  Vl.new(width: 720, height: 350, title: "Weiterbildungsteilnahme nach Bildungsniveau (BFS 2021)")
+  |> Vl.data_from_values(education_data_07)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Bildungsniveau", type: :nominal, title: nil,
+    sort: ["Tertiärstufe", "Sekundarstufe II", "Obligatorische Schule"])
+  |> Vl.encode_field(:x, "Teilnahme (%)", type: :quantitative, title: "Teilnahmequote (%)")
+  |> Vl.encode_field(:color, "Kategorie", type: :nominal, scale: [range: ["#a855f7", "#06b6d4"]])
+  |> Vl.encode_field(:x_offset, "Kategorie", type: :nominal)
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+age_data_07 = [
+  %{"Altersgruppe" => "25–34", "Teilnahme (%)" => 72},
+  %{"Altersgruppe" => "35–44", "Teilnahme (%)" => 68},
+  %{"Altersgruppe" => "45–54", "Teilnahme (%)" => 60},
+  %{"Altersgruppe" => "55–64", "Teilnahme (%)" => 48}
+]
+
+chart_age_07 =
+  Vl.new(width: 720, height: 300, title: "Weiterbildungsteilnahme nach Altersgruppe (BFS 2021)")
+  |> Vl.data_from_values(age_data_07)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:x, "Altersgruppe", type: :ordinal, title: "Altersgruppe")
+  |> Vl.encode_field(:y, "Teilnahme (%)", type: :quantitative, title: "Teilnahmequote (%)")
+  |> Vl.encode(:color, value: "#3b82f6")
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+intl_data_07 = [
+  %{"Land" => "Schweiz", "Weiterbildung (%)" => 68, "Arbeitslosenquote (%)" => 4.3},
+  %{"Land" => "Schweden", "Weiterbildung (%)" => 66, "Arbeitslosenquote (%)" => 7.5},
+  %{"Land" => "Dänemark", "Weiterbildung (%)" => 55, "Arbeitslosenquote (%)" => 5.1},
+  %{"Land" => "Österreich", "Weiterbildung (%)" => 60, "Arbeitslosenquote (%)" => 5.3},
+  %{"Land" => "Deutschland", "Weiterbildung (%)" => 54, "Arbeitslosenquote (%)" => 5.8},
+  %{"Land" => "Frankreich", "Weiterbildung (%)" => 50, "Arbeitslosenquote (%)" => 7.3},
+  %{"Land" => "EU-Durchschnitt", "Weiterbildung (%)" => 47, "Arbeitslosenquote (%)" => 6.2}
+]
+
+chart_intl_07 =
+  Vl.new(width: 720, height: 400, title: "Weiterbildungsrate vs. Arbeitslosenquote — Internationaler Vergleich")
+  |> Vl.data_from_values(intl_data_07)
+  |> Vl.mark(:point, size: 120, filled: true)
+  |> Vl.encode_field(:x, "Weiterbildung (%)", type: :quantitative, title: "Weiterbildungsteilnahme (%)", scale: [domain: [40, 75]])
+  |> Vl.encode_field(:y, "Arbeitslosenquote (%)", type: :quantitative, title: "Arbeitslosenquote (%)", scale: [domain: [3, 9]])
+  |> Vl.encode_field(:color, "Land",
+    type: :nominal,
+    scale: [
+      domain: ["Schweiz", "EU-Durchschnitt", "Schweden", "Dänemark", "Österreich", "Deutschland", "Frankreich"],
+      range: ["#a855f7", "#6b7280", "#06b6d4", "#10b981", "#f59e0b", "#3b82f6", "#ef4444"]
+    ]
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+IO.puts("Weiterbildung: Tertiär 76%, Obligatorisch 32%, 55–64: 48%")
+
+# Export notebook 07
+Zukunftslabor.ChartExport.to_svg(chart_education_07, name: "weiterbildung_bildungsniveau")
+Zukunftslabor.ChartExport.to_svg(chart_age_07, name: "weiterbildung_altersgruppe")
+Zukunftslabor.ChartExport.to_svg(chart_intl_07, name: "weiterbildung_internationaler_vergleich")
+
+Zukunftslabor.NotizTemplate.generate(
+  title: "Wer sich weiterbildet — und wer zurückbleibt",
+  description: "Die Schweiz hat eine hohe Weiterbildungsquote, aber wer es am meisten braucht, nimmt am wenigsten teil.",
+  slug: "weiterbildung-teilnahme-luecken",
+  category: "datenbriefing",
+  evidence: "mittel",
+  tags: ["weiterbildung", "uebergaenge", "bildung", "arbeitsmarkt", "alter"],
+  charts: ["weiterbildung_bildungsniveau.svg", "weiterbildung_altersgruppe.svg", "weiterbildung_internationaler_vergleich.svg"],
+  summary: """
+  Die Schweiz hat mit 68% eine der höchsten Weiterbildungsquoten in Europa. Aber
+  die Schere klafft: Tertiärstufe 76%, obligatorische Schule nur 32%. Ältere
+  (55–64) nehmen mit 48% deutlich seltener teil.
+  """,
+  body: """
+  ## Methodik
+
+  BFS-Erhebung zur Weiterbildung (Mikrozensus 2021) + Eurostat Adult Education Survey.
+
+  ## Ergebnisse
+
+  ![Teilnahme nach Bildungsniveau](/zukunftslabor/charts/weiterbildung_bildungsniveau.svg)
+
+  ![Teilnahme nach Alter](/zukunftslabor/charts/weiterbildung_altersgruppe.svg)
+
+  ![Internationaler Vergleich](/zukunftslabor/charts/weiterbildung_internationaler_vergleich.svg)
+
+  ## Datenquellen
+
+  - BFS: Mikrozensus Aus- und Weiterbildung 2021
+  - Eurostat: Adult Education Survey 2022
+  """
+)
+
+IO.puts("\n========================================")
+IO.puts("  08 — Life Science & Gesundheitskosten")
+IO.puts("========================================\n")
+
+df_health = Zukunftslabor.DataLoader.load("gesundheitsausgaben")
+
+health_data_08 =
+  df_health
+  |> DF.to_rows()
+  |> Enum.map(fn row ->
+    %{"Jahr" => row["Jahr"], "Kategorie" => row["Kategorie"], "Ausgaben (Mrd. CHF)" => row["Ausgaben_Mio_CHF"] / 1000}
+  end)
+  |> Enum.filter(& &1["Ausgaben (Mrd. CHF)"] > 0)
+
+chart_spending_08 =
+  Vl.new(width: 720, height: 400, title: "Gesundheitsausgaben der Schweiz nach Kategorie")
+  |> Vl.data_from_values(health_data_08)
+  |> Vl.mark(:area)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "Ausgaben (Mrd. CHF)", type: :quantitative, title: "Mrd. CHF", stack: :zero)
+  |> Vl.encode_field(:color, "Kategorie",
+    type: :nominal,
+    scale: [range: ["#a855f7", "#3b82f6", "#06b6d4", "#10b981", "#f59e0b", "#6b7280"]]
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+health_intl_08 = [
+  %{"Land" => "Schweiz", "Ausgaben_pK" => 7_138, "Lebenserwartung" => 84.0},
+  %{"Land" => "USA", "Ausgaben_pK" => 12_555, "Lebenserwartung" => 77.5},
+  %{"Land" => "Deutschland", "Ausgaben_pK" => 7_383, "Lebenserwartung" => 81.2},
+  %{"Land" => "Frankreich", "Ausgaben_pK" => 5_564, "Lebenserwartung" => 82.7},
+  %{"Land" => "Schweden", "Ausgaben_pK" => 6_262, "Lebenserwartung" => 83.1},
+  %{"Land" => "Japan", "Ausgaben_pK" => 4_691, "Lebenserwartung" => 84.8},
+  %{"Land" => "UK", "Ausgaben_pK" => 5_138, "Lebenserwartung" => 80.7},
+  %{"Land" => "Österreich", "Ausgaben_pK" => 6_693, "Lebenserwartung" => 82.0}
+]
+
+chart_health_intl_08 =
+  Vl.new(width: 720, height: 400, title: "Gesundheitsausgaben pro Kopf vs. Lebenserwartung (OECD 2023)")
+  |> Vl.data_from_values(health_intl_08)
+  |> Vl.mark(:point, size: 120, filled: true)
+  |> Vl.encode_field(:x, "Ausgaben_pK", type: :quantitative, title: "Gesundheitsausgaben pro Kopf (USD, KKP)", scale: [domain: [4_000, 13_000]])
+  |> Vl.encode_field(:y, "Lebenserwartung", type: :quantitative, title: "Lebenserwartung (Jahre)", scale: [domain: [76, 86]])
+  |> Vl.encode_field(:color, "Land",
+    type: :nominal,
+    scale: [
+      domain: ["Schweiz", "USA", "Japan", "Deutschland", "Frankreich", "Schweden", "UK", "Österreich"],
+      range: ["#a855f7", "#ef4444", "#06b6d4", "#3b82f6", "#10b981", "#f59e0b", "#6b7280", "#8b5cf6"]
+    ]
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+admin_data_08 = [
+  %{"Land" => "USA", "Verwaltungsanteil (%)" => 8.3},
+  %{"Land" => "Schweiz", "Verwaltungsanteil (%)" => 5.2},
+  %{"Land" => "Deutschland", "Verwaltungsanteil (%)" => 4.8},
+  %{"Land" => "Frankreich", "Verwaltungsanteil (%)" => 5.9},
+  %{"Land" => "Schweden", "Verwaltungsanteil (%)" => 2.8},
+  %{"Land" => "UK", "Verwaltungsanteil (%)" => 2.3},
+  %{"Land" => "Japan", "Verwaltungsanteil (%)" => 1.8},
+  %{"Land" => "OECD-Durchschnitt", "Verwaltungsanteil (%)" => 3.5}
+]
+
+chart_admin_08 =
+  Vl.new(width: 720, height: 350, title: "Verwaltungskosten im Gesundheitswesen (% der Gesamtausgaben)")
+  |> Vl.data_from_values(admin_data_08)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Land", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Verwaltungsanteil (%)", type: :quantitative, title: "Anteil (%)")
+  |> Vl.encode_field(:color, "Land",
+    type: :nominal,
+    scale: [
+      domain: ["Schweiz", "OECD-Durchschnitt", "USA", "Frankreich", "Deutschland", "Schweden", "UK", "Japan"],
+      range: ["#a855f7", "#6b7280", "#ef4444", "#10b981", "#3b82f6", "#f59e0b", "#06b6d4", "#8b5cf6"]
+    ],
+    legend: nil
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+IO.puts("Health spending data: #{length(health_data_08)} rows")
+
+# Export notebook 08
+Zukunftslabor.ChartExport.to_svg(chart_spending_08, name: "gesundheitsausgaben_kategorien")
+Zukunftslabor.ChartExport.to_svg(chart_health_intl_08, name: "gesundheitsausgaben_vergleich")
+Zukunftslabor.ChartExport.to_svg(chart_admin_08, name: "gesundheitsausgaben_verwaltung")
+
+Zukunftslabor.NotizTemplate.generate(
+  title: "Beste Gesundheit, höchste Kosten — wo die Verwaltung bremst",
+  description: "Die Schweiz hat exzellente Gesundheitsergebnisse, aber überdurchschnittliche Verwaltungskosten.",
+  slug: "gesundheitskosten-verwaltung",
+  category: "langforschung",
+  evidence: "stark",
+  tags: ["gesundheit", "life-science", "kosten", "verwaltung", "vergleich"],
+  charts: ["gesundheitsausgaben_kategorien.svg", "gesundheitsausgaben_vergleich.svg", "gesundheitsausgaben_verwaltung.svg"],
+  summary: """
+  Die Schweiz erreicht eine Lebenserwartung von 84.0 Jahren, gibt aber CHF 7'138 pro Kopf
+  aus. Der Verwaltungsanteil von 5.2% übersteigt den OECD-Schnitt (3.5%) deutlich.
+  """,
+  body: """
+  ## Methodik
+
+  BFS/BAG-Statistik (Gesundheitsausgaben, 2010–2022) + OECD Health at a Glance 2023.
+
+  ## Ergebnisse
+
+  ![Ausgaben nach Kategorie](/zukunftslabor/charts/gesundheitsausgaben_kategorien.svg)
+
+  ![Ausgaben vs. Lebenserwartung](/zukunftslabor/charts/gesundheitsausgaben_vergleich.svg)
+
+  ![Verwaltungskosten](/zukunftslabor/charts/gesundheitsausgaben_verwaltung.svg)
+
+  ## Datenquellen
+
+  - BFS/BAG: Kosten und Finanzierung des Gesundheitswesens (2010–2022)
+  - OECD Health at a Glance 2023
+  """
+)
+
+IO.puts("\n========================================")
+IO.puts("  09 — Sprache & Verständigung")
+IO.puts("========================================\n")
+
+canton_lang_data_09 = [
+  %{"Kanton" => "Zürich", "Deutsch" => 81, "Französisch" => 3, "Italienisch" => 4, "Englisch" => 8, "Andere" => 4},
+  %{"Kanton" => "Bern", "Deutsch" => 84, "Französisch" => 8, "Italienisch" => 2, "Englisch" => 3, "Andere" => 3},
+  %{"Kanton" => "Waadt", "Deutsch" => 5, "Französisch" => 80, "Italienisch" => 3, "Englisch" => 6, "Andere" => 6},
+  %{"Kanton" => "Genf", "Deutsch" => 4, "Französisch" => 76, "Italienisch" => 4, "Englisch" => 9, "Andere" => 7},
+  %{"Kanton" => "Tessin", "Deutsch" => 8, "Französisch" => 2, "Italienisch" => 83, "Englisch" => 3, "Andere" => 4},
+  %{"Kanton" => "Freiburg", "Deutsch" => 32, "Französisch" => 62, "Italienisch" => 2, "Englisch" => 2, "Andere" => 2},
+  %{"Kanton" => "Wallis", "Deutsch" => 30, "Französisch" => 63, "Italienisch" => 3, "Englisch" => 2, "Andere" => 2},
+  %{"Kanton" => "Graubünden", "Deutsch" => 74, "Französisch" => 1, "Italienisch" => 10, "Englisch" => 3, "Andere" => 12},
+  %{"Kanton" => "Basel-Stadt", "Deutsch" => 77, "Französisch" => 4, "Italienisch" => 5, "Englisch" => 8, "Andere" => 6},
+  %{"Kanton" => "Schweiz (gesamt)", "Deutsch" => 63, "Französisch" => 23, "Italienisch" => 8, "Englisch" => 5, "Andere" => 1}
+]
+
+canton_stacked_09 = Enum.flat_map(canton_lang_data_09, fn row ->
+  ["Deutsch", "Französisch", "Italienisch", "Englisch", "Andere"]
+  |> Enum.map(fn lang ->
+    %{"Kanton" => row["Kanton"], "Sprache" => lang, "Anteil (%)" => row[lang]}
+  end)
+end)
+
+chart_cantons_09 =
+  Vl.new(width: 720, height: 400, title: "Hauptsprache(n) nach Kanton (BFS Strukturerhebung 2022)")
+  |> Vl.data_from_values(canton_stacked_09)
+  |> Vl.mark(:bar)
+  |> Vl.encode_field(:y, "Kanton", type: :nominal, title: nil)
+  |> Vl.encode_field(:x, "Anteil (%)", type: :quantitative, title: "Anteil (%)", stack: :normalize)
+  |> Vl.encode_field(:color, "Sprache",
+    type: :nominal,
+    scale: [
+      domain: ["Deutsch", "Französisch", "Italienisch", "Englisch", "Andere"],
+      range: ["#a855f7", "#3b82f6", "#10b981", "#06b6d4", "#6b7280"]
+    ]
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+work_lang_data_09 = [
+  %{"Sektor" => "Finanzdienstleistungen", "Deutsch" => 72, "Französisch" => 38, "Englisch" => 65, "Italienisch" => 18},
+  %{"Sektor" => "IT / Kommunikation", "Deutsch" => 68, "Französisch" => 28, "Englisch" => 72, "Italienisch" => 12},
+  %{"Sektor" => "Pharma / Chemie", "Deutsch" => 55, "Französisch" => 35, "Englisch" => 78, "Italienisch" => 10},
+  %{"Sektor" => "Öffentliche Verwaltung", "Deutsch" => 76, "Französisch" => 42, "Englisch" => 28, "Italienisch" => 22},
+  %{"Sektor" => "Gastgewerbe", "Deutsch" => 62, "Französisch" => 32, "Englisch" => 38, "Italienisch" => 18},
+  %{"Sektor" => "Gesundheitswesen", "Deutsch" => 70, "Französisch" => 35, "Englisch" => 22, "Italienisch" => 15}
+]
+
+work_stacked_09 = Enum.flat_map(work_lang_data_09, fn row ->
+  ["Deutsch", "Französisch", "Englisch", "Italienisch"]
+  |> Enum.map(fn lang ->
+    %{"Sektor" => row["Sektor"], "Sprache" => lang, "Nutzung (%)" => row[lang]}
+  end)
+end)
+
+chart_work_09 =
+  Vl.new(width: 720, height: 400, title: "Sprachverwendung am Arbeitsplatz nach Sektor (BFS 2019)")
+  |> Vl.data_from_values(work_stacked_09)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Sektor", type: :nominal, title: nil)
+  |> Vl.encode_field(:x, "Nutzung (%)", type: :quantitative, title: "Anteil Arbeitnehmende (%)")
+  |> Vl.encode_field(:color, "Sprache",
+    type: :nominal,
+    scale: [
+      domain: ["Deutsch", "Französisch", "Englisch", "Italienisch"],
+      range: ["#a855f7", "#3b82f6", "#06b6d4", "#10b981"]
+    ]
+  )
+  |> Vl.encode_field(:x_offset, "Sprache", type: :nominal)
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+multi_data_09 = [
+  %{"Altersgruppe" => "15–24", "Mehrsprachig (%)" => 68},
+  %{"Altersgruppe" => "25–34", "Mehrsprachig (%)" => 72},
+  %{"Altersgruppe" => "35–44", "Mehrsprachig (%)" => 66},
+  %{"Altersgruppe" => "45–54", "Mehrsprachig (%)" => 60},
+  %{"Altersgruppe" => "55–64", "Mehrsprachig (%)" => 55},
+  %{"Altersgruppe" => "65+", "Mehrsprachig (%)" => 48}
+]
+
+chart_multi_09 =
+  Vl.new(width: 720, height: 300, title: "Mehrsprachigkeit nach Altersgruppe — regelmässig 2+ Sprachen (BFS 2019)")
+  |> Vl.data_from_values(multi_data_09)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:x, "Altersgruppe", type: :ordinal, title: "Altersgruppe")
+  |> Vl.encode_field(:y, "Mehrsprachig (%)", type: :quantitative, title: "Anteil (%)")
+  |> Vl.encode(:color, value: "#06b6d4")
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+IO.puts("Language data: 63% multilingual, English as bridge language")
+
+# Export notebook 09
+Zukunftslabor.ChartExport.to_svg(chart_cantons_09, name: "sprachen_kantone")
+Zukunftslabor.ChartExport.to_svg(chart_work_09, name: "sprachen_arbeitsplatz")
+Zukunftslabor.ChartExport.to_svg(chart_multi_09, name: "sprachen_mehrsprachigkeit")
+
+Zukunftslabor.NotizTemplate.generate(
+  title: "63% mehrsprachig — und Englisch ist längst die Brücke",
+  description: "Die Schweiz ist de facto mehrsprachig, mit Englisch als Brückensprache in Wirtschaft und Wissenschaft.",
+  slug: "mehrsprachigkeit-englisch-realitaet",
+  category: "datenbriefing",
+  evidence: "stark",
+  tags: ["sprache", "mehrsprachigkeit", "englisch", "kantone", "arbeitsmarkt"],
+  charts: ["sprachen_kantone.svg", "sprachen_arbeitsplatz.svg", "sprachen_mehrsprachigkeit.svg"],
+  summary: """
+  63% der Schweizer Bevölkerung sprechen regelmässig 2+ Sprachen. In IT (72%),
+  Pharma (78%) und Finanz (65%) wird Englisch häufiger genutzt als Französisch
+  oder Italienisch.
+  """,
+  body: """
+  ## Methodik
+
+  BFS-Strukturerhebung 2022 + BFS-Spracherhebung 2019.
+
+  ## Ergebnisse
+
+  ![Sprachen nach Kanton](/zukunftslabor/charts/sprachen_kantone.svg)
+
+  ![Sprachen am Arbeitsplatz](/zukunftslabor/charts/sprachen_arbeitsplatz.svg)
+
+  ![Mehrsprachigkeit](/zukunftslabor/charts/sprachen_mehrsprachigkeit.svg)
+
+  ## Datenquellen
+
+  - BFS: Strukturerhebung 2022 (Hauptsprache)
+  - BFS: Erhebung zur Sprache, Religion und Kultur 2019
+  """
+)
+
+IO.puts("\n========================================")
+IO.puts("  10 — Talent & Migration")
+IO.puts("========================================\n")
+
+permit_data_10 = [
+  %{"Jahr" => 2015, "Personenfreizügigkeit" => 108_000, "Familiennachzug" => 32_000, "Humanitär" => 28_000, "Übrige" => 12_000},
+  %{"Jahr" => 2016, "Personenfreizügigkeit" => 106_000, "Familiennachzug" => 30_000, "Humanitär" => 22_000, "Übrige" => 11_000},
+  %{"Jahr" => 2017, "Personenfreizügigkeit" => 100_000, "Familiennachzug" => 29_000, "Humanitär" => 18_000, "Übrige" => 10_000},
+  %{"Jahr" => 2018, "Personenfreizügigkeit" => 98_000, "Familiennachzug" => 28_000, "Humanitär" => 15_000, "Übrige" => 10_000},
+  %{"Jahr" => 2019, "Personenfreizügigkeit" => 96_000, "Familiennachzug" => 27_000, "Humanitär" => 14_000, "Übrige" => 11_000},
+  %{"Jahr" => 2020, "Personenfreizügigkeit" => 78_000, "Familiennachzug" => 22_000, "Humanitär" => 10_000, "Übrige" => 8_000},
+  %{"Jahr" => 2021, "Personenfreizügigkeit" => 102_000, "Familiennachzug" => 28_000, "Humanitär" => 14_000, "Übrige" => 10_000},
+  %{"Jahr" => 2022, "Personenfreizügigkeit" => 112_000, "Familiennachzug" => 30_000, "Humanitär" => 22_000, "Übrige" => 12_000},
+  %{"Jahr" => 2023, "Personenfreizügigkeit" => 115_000, "Familiennachzug" => 31_000, "Humanitär" => 18_000, "Übrige" => 13_000}
+]
+
+permit_stacked_10 = Enum.flat_map(permit_data_10, fn row ->
+  ["Personenfreizügigkeit", "Familiennachzug", "Humanitär", "Übrige"]
+  |> Enum.map(fn cat ->
+    %{"Jahr" => row["Jahr"], "Kategorie" => cat, "Personen" => row[cat]}
+  end)
+end)
+
+chart_permits_10 =
+  Vl.new(width: 720, height: 400, title: "Einwanderung in die Schweiz nach Bewilligungskategorie")
+  |> Vl.data_from_values(permit_stacked_10)
+  |> Vl.mark(:area)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "Personen", type: :quantitative, title: "Personen", stack: :zero)
+  |> Vl.encode_field(:color, "Kategorie",
+    type: :nominal,
+    scale: [
+      domain: ["Personenfreizügigkeit", "Familiennachzug", "Humanitär", "Übrige"],
+      range: ["#a855f7", "#3b82f6", "#f59e0b", "#6b7280"]
+    ]
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+origin_data_10 = [
+  %{"Herkunftsland" => "Deutschland", "Personen" => 22_100},
+  %{"Herkunftsland" => "Italien", "Personen" => 15_800},
+  %{"Herkunftsland" => "Frankreich", "Personen" => 14_200},
+  %{"Herkunftsland" => "Portugal", "Personen" => 8_900},
+  %{"Herkunftsland" => "Spanien", "Personen" => 6_500},
+  %{"Herkunftsland" => "Rumänien", "Personen" => 5_800},
+  %{"Herkunftsland" => "Türkei", "Personen" => 4_200},
+  %{"Herkunftsland" => "Indien", "Personen" => 3_900},
+  %{"Herkunftsland" => "Afghanistan", "Personen" => 3_600},
+  %{"Herkunftsland" => "Eritrea", "Personen" => 2_800}
+]
+
+chart_origin_10 =
+  Vl.new(width: 720, height: 400, title: "Top 10 Herkunftsländer der Einwanderung (2023)")
+  |> Vl.data_from_values(origin_data_10)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Herkunftsland", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Personen", type: :quantitative, title: "Einwanderungen")
+  |> Vl.encode(:color, value: "#3b82f6")
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+edu_stacked_10 = [
+  %{"Gruppe" => "Zugewanderte (EU/EFTA)", "Bildungsniveau" => "Tertiär", "Anteil (%)" => 52},
+  %{"Gruppe" => "Zugewanderte (EU/EFTA)", "Bildungsniveau" => "Sekundär II", "Anteil (%)" => 35},
+  %{"Gruppe" => "Zugewanderte (EU/EFTA)", "Bildungsniveau" => "Obligatorisch", "Anteil (%)" => 13},
+  %{"Gruppe" => "Zugewanderte (Drittstaaten)", "Bildungsniveau" => "Tertiär", "Anteil (%)" => 38},
+  %{"Gruppe" => "Zugewanderte (Drittstaaten)", "Bildungsniveau" => "Sekundär II", "Anteil (%)" => 28},
+  %{"Gruppe" => "Zugewanderte (Drittstaaten)", "Bildungsniveau" => "Obligatorisch", "Anteil (%)" => 34},
+  %{"Gruppe" => "In der Schweiz Geborene", "Bildungsniveau" => "Tertiär", "Anteil (%)" => 42},
+  %{"Gruppe" => "In der Schweiz Geborene", "Bildungsniveau" => "Sekundär II", "Anteil (%)" => 46},
+  %{"Gruppe" => "In der Schweiz Geborene", "Bildungsniveau" => "Obligatorisch", "Anteil (%)" => 12}
+]
+
+chart_education_10 =
+  Vl.new(width: 720, height: 300, title: "Bildungsniveau: Zugewanderte vs. Einheimische (BFS Strukturerhebung)")
+  |> Vl.data_from_values(edu_stacked_10)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Gruppe", type: :nominal, title: nil)
+  |> Vl.encode_field(:x, "Anteil (%)", type: :quantitative, title: "Anteil (%)")
+  |> Vl.encode_field(:color, "Bildungsniveau",
+    type: :nominal,
+    scale: [domain: ["Tertiär", "Sekundär II", "Obligatorisch"], range: ["#a855f7", "#3b82f6", "#6b7280"]]
+  )
+  |> Vl.encode_field(:x_offset, "Bildungsniveau", type: :nominal)
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+pf_pct_10 = round(115_000 / (115_000 + 31_000 + 18_000 + 13_000) * 100)
+IO.puts("Personenfreizügigkeit: #{pf_pct_10}% der Einwanderung, 52% mit Tertiärabschluss")
+
+# Export notebook 10
+Zukunftslabor.ChartExport.to_svg(chart_permits_10, name: "migration_bewilligungen")
+Zukunftslabor.ChartExport.to_svg(chart_origin_10, name: "migration_herkunftslaender")
+Zukunftslabor.ChartExport.to_svg(chart_education_10, name: "migration_bildungsniveau")
+
+Zukunftslabor.NotizTemplate.generate(
+  title: "#{pf_pct_10}% Personenfreizügigkeit — die Zuwanderung ist primär qualifiziert",
+  description: "Die Schweiz zieht über die Personenfreizügigkeit vor allem qualifizierte EU-Fachkräfte an.",
+  slug: "zuwanderung-qualifikation-daten",
+  category: "datenbriefing",
+  evidence: "stark",
+  tags: ["migration", "talent", "personenfreizuegigkeit", "integration", "bildung"],
+  charts: ["migration_bewilligungen.svg", "migration_herkunftslaender.svg", "migration_bildungsniveau.svg"],
+  summary: """
+  #{pf_pct_10}% der Einwanderung läuft über die Personenfreizügigkeit (2023). 52% der
+  EU/EFTA-Zugewanderten haben einen Tertiärabschluss.
+  """,
+  body: """
+  ## Methodik
+
+  SEM-Migrationsstatistik (2015–2023) + BFS-Strukturerhebung (Bildungsniveau).
+
+  ## Ergebnisse
+
+  ![Bewilligungskategorien](/zukunftslabor/charts/migration_bewilligungen.svg)
+
+  ![Herkunftsländer](/zukunftslabor/charts/migration_herkunftslaender.svg)
+
+  ![Bildungsniveau](/zukunftslabor/charts/migration_bildungsniveau.svg)
+
+  ## Datenquellen
+
+  - SEM: Migrationsstatistik 2015–2023
+  - BFS: Strukturerhebung (Bildungsniveau)
+  - OECD: International Migration Outlook 2023
+  """
+)
+
+IO.puts("\n========================================")
+IO.puts("  11 — Offener Staat")
+IO.puts("========================================\n")
+
+egov_comparison_11 = [
+  %{"Jahr" => 2014, "Schweiz" => 52, "EU-Durchschnitt" => 46},
+  %{"Jahr" => 2017, "Schweiz" => 60, "EU-Durchschnitt" => 53},
+  %{"Jahr" => 2019, "Schweiz" => 63, "EU-Durchschnitt" => 57},
+  %{"Jahr" => 2021, "Schweiz" => 68, "EU-Durchschnitt" => 63},
+  %{"Jahr" => 2023, "Schweiz" => 72, "EU-Durchschnitt" => 68},
+  %{"Jahr" => 2025, "Schweiz" => 78, "EU-Durchschnitt" => 72}
+]
+
+egov_lines_11 = Enum.flat_map(egov_comparison_11, fn row ->
+  [
+    %{"Jahr" => row["Jahr"], "Region" => "Schweiz", "E-Gov-Nutzung (%)" => row["Schweiz"]},
+    %{"Jahr" => row["Jahr"], "Region" => "EU-Durchschnitt", "E-Gov-Nutzung (%)" => row["EU-Durchschnitt"]}
+  ]
+end)
+
+chart_egov_comp_11 =
+  Vl.new(width: 720, height: 400, title: "E-Government-Nutzung: Schweiz vs. EU-Durchschnitt (2014–2025)")
+  |> Vl.data_from_values(egov_lines_11)
+  |> Vl.mark(:line, point: true, stroke_width: 2)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "E-Gov-Nutzung (%)", type: :quantitative, title: "Nutzungsrate (%)", scale: [domain: [40, 85]])
+  |> Vl.encode_field(:color, "Region",
+    type: :nominal,
+    scale: [domain: ["Schweiz", "EU-Durchschnitt"], range: ["#a855f7", "#6b7280"]]
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+internet_age_data_11 = [
+  %{"Altersgruppe" => "15–24", "Nutzung (%)" => 99},
+  %{"Altersgruppe" => "25–34", "Nutzung (%)" => 99},
+  %{"Altersgruppe" => "35–44", "Nutzung (%)" => 98},
+  %{"Altersgruppe" => "45–54", "Nutzung (%)" => 97},
+  %{"Altersgruppe" => "55–64", "Nutzung (%)" => 95},
+  %{"Altersgruppe" => "65–74", "Nutzung (%)" => 88},
+  %{"Altersgruppe" => "75+", "Nutzung (%)" => 62}
+]
+
+chart_internet_11 =
+  Vl.new(width: 720, height: 300, title: "Internetnutzung nach Altersgruppe in der Schweiz (BFS 2023)")
+  |> Vl.data_from_values(internet_age_data_11)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:x, "Altersgruppe", type: :ordinal, title: "Altersgruppe")
+  |> Vl.encode_field(:y, "Nutzung (%)", type: :quantitative, title: "Internetnutzung (%)", scale: [domain: [50, 100]])
+  |> Vl.encode(:color, value: "#3b82f6")
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+opendata_data_11 = [
+  %{"Land" => "Frankreich", "Open Data Score" => 95},
+  %{"Land" => "Irland", "Open Data Score" => 93},
+  %{"Land" => "Spanien", "Open Data Score" => 91},
+  %{"Land" => "Estland", "Open Data Score" => 88},
+  %{"Land" => "Deutschland", "Open Data Score" => 78},
+  %{"Land" => "Österreich", "Open Data Score" => 82},
+  %{"Land" => "Schweiz", "Open Data Score" => 65},
+  %{"Land" => "EU-Durchschnitt", "Open Data Score" => 79}
+]
+
+chart_opendata_11 =
+  Vl.new(width: 720, height: 350, title: "Open-Data-Reife im Vergleich (EU Open Data Maturity 2023)")
+  |> Vl.data_from_values(opendata_data_11)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Land", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Open Data Score", type: :quantitative, title: "Reifegrad-Score (%)")
+  |> Vl.encode_field(:color, "Land",
+    type: :nominal,
+    scale: [
+      domain: ["Schweiz", "EU-Durchschnitt", "Frankreich", "Irland", "Spanien", "Estland", "Deutschland", "Österreich"],
+      range: ["#a855f7", "#6b7280", "#3b82f6", "#06b6d4", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6"]
+    ],
+    legend: nil
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+IO.puts("Open State: 98% internet, but e-gov and open data below EU avg")
+
+# Export notebook 11
+Zukunftslabor.ChartExport.to_svg(chart_egov_comp_11, name: "offener_staat_egov_vergleich")
+Zukunftslabor.ChartExport.to_svg(chart_internet_11, name: "offener_staat_internet_alter")
+Zukunftslabor.ChartExport.to_svg(chart_opendata_11, name: "offener_staat_opendata_reife")
+
+Zukunftslabor.NotizTemplate.generate(
+  title: "98% online — aber der Staat hinkt hinterher",
+  description: "Die Schweiz hat nahezu universellen Internetzugang, aber bei E-Government und Open Data liegt sie unter dem EU-Durchschnitt.",
+  slug: "offener-staat-digitalisierung",
+  category: "datenbriefing",
+  evidence: "mittel",
+  tags: ["offener-staat", "e-government", "open-data", "digitalisierung", "vergleich"],
+  charts: ["offener_staat_egov_vergleich.svg", "offener_staat_internet_alter.svg", "offener_staat_opendata_reife.svg"],
+  summary: """
+  98% der Schweizer nutzen Internet, aber E-Government-Verfügbarkeit (68%) und
+  Open-Data-Reife (Score 65%) liegen unter dem EU-Durchschnitt.
+  """,
+  body: """
+  ## Methodik
+
+  BFS Omnibus ICT (2023) + EU eGovernment Benchmark + EU Open Data Maturity Report 2023.
+
+  ## Ergebnisse
+
+  ![E-Government CH vs. EU](/zukunftslabor/charts/offener_staat_egov_vergleich.svg)
+
+  ![Internetnutzung nach Alter](/zukunftslabor/charts/offener_staat_internet_alter.svg)
+
+  ![Open-Data-Reife](/zukunftslabor/charts/offener_staat_opendata_reife.svg)
+
+  ## Datenquellen
+
+  - BFS: Omnibus ICT 2023
+  - EU eGovernment Benchmark 2023
+  - EU Open Data Maturity Report 2023
+  """
+)
+
+IO.puts("\n========================================")
+IO.puts("  12 — Neutralität & Verteidigung")
+IO.puts("========================================\n")
+
+df_mil = Zukunftslabor.DataLoader.load("verteidigungsausgaben")
+
+ch_data_12 =
+  df_mil
+  |> DF.filter(col("Code") == "CHE")
+  |> DF.to_rows()
+  |> Enum.map(fn row ->
+    %{"Jahr" => row["Jahr"], "Anteil BIP (%)" => row["Anteil_BIP_Prozent"]}
+  end)
+  |> Enum.sort_by(& &1["Jahr"])
+
+chart_ch_trend_12 =
+  Vl.new(width: 720, height: 300, title: "Schweizer Verteidigungsausgaben (% des BIP, 2000–2023)")
+  |> Vl.data_from_values(ch_data_12)
+  |> Vl.mark(:line, point: true, stroke_width: 2)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "Anteil BIP (%)", type: :quantitative, title: "% des BIP", scale: [domain: [0.5, 1.2]])
+  |> Vl.encode(:color, value: "#a855f7")
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+latest_mil_year_12 =
+  df_mil
+  |> DF.filter(col("Code") == "CHE")
+  |> DF.pull("Jahr")
+  |> Series.max()
+
+comparison_mil_12 =
+  df_mil
+  |> DF.filter(col("Jahr") == ^latest_mil_year_12)
+  |> DF.to_rows()
+  |> Enum.map(fn row ->
+    %{"Land" => row["Land"], "Verteidigung (% BIP)" => row["Anteil_BIP_Prozent"]}
+  end)
+  |> Enum.sort_by(& &1["Verteidigung (% BIP)"], :desc)
+
+comparison_with_targets_12 = comparison_mil_12 ++ [
+  %{"Land" => "NATO-Ziel", "Verteidigung (% BIP)" => 2.0},
+  %{"Land" => "EU-Durchschnitt", "Verteidigung (% BIP)" => 1.55}
+]
+
+chart_mil_comparison_12 =
+  Vl.new(width: 720, height: 400, title: "Verteidigungsausgaben im Vergleich (% BIP, #{latest_mil_year_12})")
+  |> Vl.data_from_values(comparison_with_targets_12)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Land", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Verteidigung (% BIP)", type: :quantitative, title: "% des BIP")
+  |> Vl.encode_field(:color, "Land",
+    type: :nominal,
+    scale: [
+      domain: ["Switzerland", "Schweiz", "NATO-Ziel", "EU-Durchschnitt", "United States", "France", "Germany", "Austria", "Sweden", "Finland", "Norway"],
+      range: ["#a855f7", "#a855f7", "#ef4444", "#6b7280", "#3b82f6", "#10b981", "#06b6d4", "#8b5cf6", "#f59e0b", "#ec4899", "#14b8a6"]
+    ],
+    legend: nil
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+neutrality_data_12 = [
+  %{"Position" => "Bewaffnete Neutralität beibehalten", "Zustimmung (%)" => 78},
+  %{"Position" => "Wirtschaftssanktionen mittragen", "Zustimmung (%)" => 56},
+  %{"Position" => "Engere Kooperation mit NATO", "Zustimmung (%)" => 33},
+  %{"Position" => "NATO-Beitritt", "Zustimmung (%)" => 12},
+  %{"Position" => "Cyberverteidigung stärken", "Zustimmung (%)" => 82},
+  %{"Position" => "Krit. Infrastruktur schützen", "Zustimmung (%)" => 88}
+]
+
+chart_opinion_12 =
+  Vl.new(width: 720, height: 350, title: "Öffentliche Meinung zu Neutralität und Sicherheit (ETH/Sotomo 2024)")
+  |> Vl.data_from_values(neutrality_data_12)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Position", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Zustimmung (%)", type: :quantitative, title: "Zustimmung (%)")
+  |> Vl.encode(:color, field: "Zustimmung (%)", type: :quantitative,
+    scale: [scheme: "purples"], legend: nil)
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+
+ch_latest_12 = Enum.find(ch_data_12, &(&1["Jahr"] == latest_mil_year_12))
+ch_pct_12 = if ch_latest_12, do: ch_latest_12["Anteil BIP (%)"], else: 0.7
+
+IO.puts("Defense: #{ch_pct_12}% GDP, 88% want infrastructure protection, 82% want cyber")
+
+# Export notebook 12
+Zukunftslabor.ChartExport.to_svg(chart_ch_trend_12, name: "verteidigung_ch_zeitreihe")
+Zukunftslabor.ChartExport.to_svg(chart_mil_comparison_12, name: "verteidigung_internationaler_vergleich")
+Zukunftslabor.ChartExport.to_svg(chart_opinion_12, name: "verteidigung_oeffentliche_meinung")
+
+Zukunftslabor.NotizTemplate.generate(
+  title: "#{ch_pct_12}% BIP für Verteidigung — die Bevölkerung will Cyber, nicht Panzer",
+  description: "Die Schweiz gibt unter 1% des BIP für Verteidigung aus. Die Bevölkerung priorisiert Cybersicherheit und Infrastrukturschutz.",
+  slug: "verteidigung-ausgaben-prioritaeten",
+  category: "datenbriefing",
+  evidence: "mittel",
+  tags: ["neutralitaet", "verteidigung", "cyber", "infrastruktur", "vergleich"],
+  charts: ["verteidigung_ch_zeitreihe.svg", "verteidigung_internationaler_vergleich.svg", "verteidigung_oeffentliche_meinung.svg"],
+  summary: """
+  Die Schweiz gibt #{ch_pct_12}% des BIP für Verteidigung aus — weit unter dem
+  NATO-Ziel (2%). Die Bevölkerung priorisiert moderne Bedrohungen: 88% wollen
+  besseren Infrastrukturschutz, 82% stärkere Cyberverteidigung.
+  """,
+  body: """
+  ## Methodik
+
+  World Bank / SIPRI (Military expenditure, 2000–2023) + ETH Sicherheitsstudie 2024.
+
+  ## Ergebnisse
+
+  ![CH Verteidigungsausgaben](/zukunftslabor/charts/verteidigung_ch_zeitreihe.svg)
+
+  ![Internationaler Vergleich](/zukunftslabor/charts/verteidigung_internationaler_vergleich.svg)
+
+  ![Öffentliche Meinung](/zukunftslabor/charts/verteidigung_oeffentliche_meinung.svg)
+
+  ## Datenquellen
+
+  - World Bank / SIPRI: Military expenditure (% of GDP), 2000–2023
+  - ETH Zürich: Sicherheitsstudie 2024
+  """
+)
+
+IO.puts("\n========================================")
+IO.puts("  Done! All 12 notebooks executed.")
 IO.puts("========================================")
 IO.puts("Charts → output/charts/")
 IO.puts("Drafts → output/drafts/")

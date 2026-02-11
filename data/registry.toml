@@ -53,3 +53,139 @@ url = "https://dam-api.bfs.admin.ch/hub/api/dam/assets/33947475/master"
 format = "xlsx"
 note = "Excel with one sheet per year (2023–2010). 26 cantons + CH total × 7 room categories."
 processed_as = "mietzinse_kantone.csv"
+
+# ─── Research & Innovation ─────────────────────────────────────────
+
+[datasets.forschung_ausgaben]
+description = "Forschung und Entwicklung: Aufwendungen nach Sektor (Privatwirtschaft, Hochschulen, Bund)"
+source = "bfs-dam"
+url = "https://dam-api.bfs.admin.ch/hub/api/dam/assets/32048839/master"
+format = "xlsx"
+note = "R&D expenditure by performing sector. Multi-sheet XLSX with years 2004–2021."
+processed_as = "forschung_ausgaben.csv"
+
+# ─── Energy & Resilience ───────────────────────────────────────────
+
+[datasets.elektrizitaet_produktion]
+description = "Elektrizitätsproduktion nach Energieträger (Wasser, Kernkraft, Solar, Wind, etc.)"
+source = "bfs-pxweb"
+table = "px-x-0800000000_103"
+note = "Electricity production by source. Annual data."
+processed_as = "elektrizitaet_produktion.csv"
+[datasets.elektrizitaet_produktion.dimensions]
+"Energieträger" = "*"
+"Jahr" = "*"
+"Einheit" = ["0"]
+
+[datasets.energieverbrauch_sektor]
+description = "Endenergieverbrauch nach Verbrauchergruppe (Industrie, Verkehr, Haushalte, Dienstleistungen)"
+source = "bfs-dam"
+url = "https://dam-api.bfs.admin.ch/hub/api/dam/assets/32327177/master"
+format = "xlsx"
+note = "Final energy consumption by sector. XLSX with annual data."
+processed_as = "energieverbrauch_sektor.csv"
+
+# ─── Transitions & Training ───────────────────────────────────────
+
+[datasets.weiterbildung_teilnahme]
+description = "Teilnahme an Weiterbildung nach Bildungsniveau, Alter und Geschlecht"
+source = "bfs-pxweb"
+table = "px-x-1504000000_101"
+note = "Continuing education participation rates. Survey data, multiple years."
+processed_as = "weiterbildung_teilnahme.csv"
+[datasets.weiterbildung_teilnahme.dimensions]
+"Weiterbildungsaktivität" = ["0"]
+"Bildungsstand" = "*"
+"Altersklasse" = "*"
+"Geschlecht" = ["0"]
+"Jahr" = "*"
+"Resultat" = ["0"]
+
+# ─── Life Science & Health ─────────────────────────────────────────
+
+[datasets.gesundheitsausgaben]
+description = "Gesundheitsausgaben nach Leistungsart (stationär, ambulant, Medikamente, Verwaltung)"
+source = "bfs-dam"
+url = "https://dam-api.bfs.admin.ch/hub/api/dam/assets/32176750/master"
+format = "xlsx"
+note = "Healthcare expenditure by category. XLSX with annual data 2010–2022."
+processed_as = "gesundheitsausgaben.csv"
+
+# ─── Language & Communication ─────────────────────────────────────
+
+[datasets.sprachen_hauptsprache]
+description = "Hauptsprache(n) der Bevölkerung nach Kanton"
+source = "bfs-pxweb"
+table = "px-x-0100010000_121"
+note = "Main language by canton from structural survey."
+processed_as = "sprachen_hauptsprache.csv"
+[datasets.sprachen_hauptsprache.dimensions]
+"Kanton" = "*"
+"Hauptsprache(n)" = "*"
+"Geschlecht" = ["0"]
+"Staatsangehörigkeit (Kategorie)" = ["0"]
+"Jahr" = "*"
+"Resultat" = ["0"]
+
+[datasets.sprachen_beruf]
+description = "Bei der Arbeit verwendete Sprachen (Deutsch, Französisch, Italienisch, Englisch)"
+source = "bfs-pxweb"
+table = "px-x-0100010000_131"
+note = "Languages used at work. BFS language survey."
+processed_as = "sprachen_beruf.csv"
+[datasets.sprachen_beruf.dimensions]
+"Bei der Arbeit gebrauchte Sprache(n)" = "*"
+"Wirtschaftssektor" = "*"
+"Geschlecht" = ["0"]
+"Jahr" = "*"
+"Resultat" = ["0"]
+
+# ─── Talent & Migration ───────────────────────────────────────────
+
+[datasets.auslaender_aufenthalt]
+description = "Ausländische Wohnbevölkerung nach Aufenthaltsbewilligung und Staatsangehörigkeit"
+source = "bfs-pxweb"
+table = "px-x-0103020000_101"
+note = "Foreign population by permit type and nationality group."
+processed_as = "auslaender_aufenthalt.csv"
+[datasets.auslaender_aufenthalt.dimensions]
+"Aufenthaltsbewilligung" = "*"
+"Staatsangehörigkeit (Kontinent)" = "*"
+"Geschlecht" = ["0"]
+"Jahr" = "*"
+"Resultat" = ["0"]
+
+[datasets.wanderungen]
+description = "Internationale Wanderungen: Ein- und Auswanderungen nach Staatsangehörigkeit"
+source = "bfs-dam"
+url = "https://dam-api.bfs.admin.ch/hub/api/dam/assets/32586954/master"
+format = "xlsx"
+note = "Immigration/emigration flows by nationality group. Multi-year XLSX."
+processed_as = "wanderungen.csv"
+
+# ─── Open State ────────────────────────────────────────────────────
+
+[datasets.ikt_internetnutzung]
+description = "Internetnutzung nach Altersgruppe und Häufigkeit"
+source = "bfs-pxweb"
+table = "px-x-1604000000_101"
+note = "Internet usage by age group and frequency. BFS Omnibus ICT."
+processed_as = "ikt_internetnutzung.csv"
+[datasets.ikt_internetnutzung.dimensions]
+"Internetnutzung" = ["IU11"]
+"Geschlecht" = ["0"]
+"Altersklasse" = "*"
+"Bildungsstand" = ["0"]
+"Jahr" = "*"
+"Absolut / relativ" = ["1"]
+"Resultat" = ["0"]
+
+# ─── Neutrality & Defense ─────────────────────────────────────────
+
+[datasets.verteidigungsausgaben]
+description = "Militärausgaben als Anteil am BIP — World Bank / SIPRI"
+source = "url"
+url = "https://api.worldbank.org/v2/country/CHE;DEU;FRA;AUT;SWE;FIN;NOR;USA/indicator/MS.MIL.XPND.GD.ZS?date=2000:2023&format=csv&source=2"
+format = "csv"
+note = "World Bank API: Military expenditure (% of GDP). ZIP download with CSV inside."
+processed_as = "verteidigungsausgaben.csv"

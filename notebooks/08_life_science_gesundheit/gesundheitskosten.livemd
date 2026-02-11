@@ -1,0 +1,210 @@
+# Life Science & Gesundheitskosten
+
+```elixir
+Mix.install([
+  {:explorer, "~> 0.11"},
+  {:vega_lite, "~> 0.1"},
+  {:kino_vega_lite, "~> 0.1"},
+  {:kino_explorer, "~> 0.1"},
+  {:kino, "~> 0.14"},
+  {:jason, "~> 1.4"},
+  {:vega_lite_convert, "~> 1.0"},
+  {:toml, "~> 0.7"},
+  {:req, "~> 0.5"}
+])
+```
+
+## Fragestellung
+
+> Wofür gibt die Schweiz ihre Gesundheitsausgaben aus — und was kommt dabei raus?
+
+**Kategorie**: Langforschung
+**Evidenzstärke**: stark (amtliche BFS/BAG-Daten + OECD Health Statistics)
+
+## Daten laden
+
+```elixir
+alias Explorer.DataFrame, as: DF
+alias Explorer.Series
+
+# Healthcare expenditure by category
+# Columns: Jahr (s64), Kategorie (string), Ausgaben_Mio_CHF (f64)
+df_health = Zukunftslabor.DataLoader.load("gesundheitsausgaben")
+```
+
+## Analyse: Gesundheitsausgaben nach Kategorie
+
+```elixir
+alias VegaLite, as: Vl
+
+# Stacked area chart — spending by category over time
+health_data =
+  df_health
+  |> DF.to_rows()
+  |> Enum.map(fn row ->
+    %{
+      "Jahr" => row["Jahr"],
+      "Kategorie" => row["Kategorie"],
+      "Ausgaben (Mrd. CHF)" => row["Ausgaben_Mio_CHF"] / 1000
+    }
+  end)
+  |> Enum.filter(& &1["Ausgaben (Mrd. CHF)"] > 0)
+
+chart_spending =
+  Vl.new(width: 720, height: 400, title: "Gesundheitsausgaben der Schweiz nach Kategorie")
+  |> Vl.data_from_values(health_data)
+  |> Vl.mark(:area)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "Ausgaben (Mrd. CHF)", type: :quantitative, title: "Mrd. CHF", stack: :zero)
+  |> Vl.encode_field(:color, "Kategorie",
+    type: :nominal,
+    scale: [range: ["#a855f7", "#3b82f6", "#06b6d4", "#10b981", "#f59e0b", "#6b7280"]]
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Internationaler Vergleich: Ausgaben vs. Lebenserwartung
+
+```elixir
+# Health spending per capita (PPP) vs life expectancy
+# Source: OECD Health Statistics 2023
+health_intl = [
+  %{"Land" => "Schweiz", "Ausgaben_pK" => 7_138, "Lebenserwartung" => 84.0},
+  %{"Land" => "USA", "Ausgaben_pK" => 12_555, "Lebenserwartung" => 77.5},
+  %{"Land" => "Deutschland", "Ausgaben_pK" => 7_383, "Lebenserwartung" => 81.2},
+  %{"Land" => "Frankreich", "Ausgaben_pK" => 5_564, "Lebenserwartung" => 82.7},
+  %{"Land" => "Schweden", "Ausgaben_pK" => 6_262, "Lebenserwartung" => 83.1},
+  %{"Land" => "Japan", "Ausgaben_pK" => 4_691, "Lebenserwartung" => 84.8},
+  %{"Land" => "UK", "Ausgaben_pK" => 5_138, "Lebenserwartung" => 80.7},
+  %{"Land" => "Österreich", "Ausgaben_pK" => 6_693, "Lebenserwartung" => 82.0}
+]
+
+chart_health_intl =
+  Vl.new(width: 720, height: 400, title: "Gesundheitsausgaben pro Kopf vs. Lebenserwartung (OECD 2023)")
+  |> Vl.data_from_values(health_intl)
+  |> Vl.mark(:point, size: 120, filled: true)
+  |> Vl.encode_field(:x, "Ausgaben_pK",
+    type: :quantitative,
+    title: "Gesundheitsausgaben pro Kopf (USD, KKP)",
+    scale: [domain: [4_000, 13_000]]
+  )
+  |> Vl.encode_field(:y, "Lebenserwartung",
+    type: :quantitative,
+    title: "Lebenserwartung bei Geburt (Jahre)",
+    scale: [domain: [76, 86]]
+  )
+  |> Vl.encode_field(:color, "Land",
+    type: :nominal,
+    scale: [
+      domain: ["Schweiz", "USA", "Japan", "Deutschland", "Frankreich", "Schweden", "UK", "Österreich"],
+      range: ["#a855f7", "#ef4444", "#06b6d4", "#3b82f6", "#10b981", "#f59e0b", "#6b7280", "#8b5cf6"]
+    ]
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Verwaltungskosten im Vergleich
+
+```elixir
+# Administrative costs as % of total health spending
+# Source: OECD Health at a Glance 2023
+admin_data = [
+  %{"Land" => "USA", "Verwaltungsanteil (%)" => 8.3},
+  %{"Land" => "Schweiz", "Verwaltungsanteil (%)" => 5.2},
+  %{"Land" => "Deutschland", "Verwaltungsanteil (%)" => 4.8},
+  %{"Land" => "Frankreich", "Verwaltungsanteil (%)" => 5.9},
+  %{"Land" => "Schweden", "Verwaltungsanteil (%)" => 2.8},
+  %{"Land" => "UK", "Verwaltungsanteil (%)" => 2.3},
+  %{"Land" => "Japan", "Verwaltungsanteil (%)" => 1.8},
+  %{"Land" => "OECD-Durchschnitt", "Verwaltungsanteil (%)" => 3.5}
+]
+
+chart_admin =
+  Vl.new(width: 720, height: 350, title: "Verwaltungskosten im Gesundheitswesen (% der Gesamtausgaben)")
+  |> Vl.data_from_values(admin_data)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Land", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Verwaltungsanteil (%)", type: :quantitative, title: "Anteil (%)")
+  |> Vl.encode_field(:color, "Land",
+    type: :nominal,
+    scale: [
+      domain: ["Schweiz", "OECD-Durchschnitt", "USA", "Frankreich", "Deutschland", "Schweden", "UK", "Japan"],
+      range: ["#a855f7", "#6b7280", "#ef4444", "#10b981", "#3b82f6", "#f59e0b", "#06b6d4", "#8b5cf6"]
+    ],
+    legend: nil
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Kernaussage
+
+```elixir
+Kino.Markdown.new("""
+### Kernaussage
+
+Die Schweiz hat **hervorragende Gesundheitsergebnisse** (Lebenserwartung 84.0 Jahre,
+Top 5 weltweit), aber **mit die höchsten Kosten** global (CHF 7'138/Kopf, KKP).
+
+Der **Verwaltungsanteil** von 5.2% liegt über dem OECD-Durchschnitt (3.5%). Das
+sind nicht «die Ärzte, die zu viel verdienen» — es ist **Bürokratie zwischen
+Versicherern, Kantonen und Leistungserbringern**. Die Komplexität des Systems
+selbst ist ein Kostentreiber.
+
+Life Science als Partei-Pillar bedeutet: Effizienz durch Digitalisierung und
+Standardisierung, nicht durch Leistungskürzung. Transparenz statt Misstrauen.
+""")
+```
+
+## Export
+
+```elixir
+Zukunftslabor.ChartExport.to_svg(chart_spending, name: "gesundheitsausgaben_kategorien")
+Zukunftslabor.ChartExport.to_svg(chart_health_intl, name: "gesundheitsausgaben_vergleich")
+Zukunftslabor.ChartExport.to_svg(chart_admin, name: "gesundheitsausgaben_verwaltung")
+
+Zukunftslabor.NotizTemplate.generate(
+  title: "Beste Gesundheit, höchste Kosten — wo die Verwaltung bremst",
+  description: "Die Schweiz hat exzellente Gesundheitsergebnisse, aber überdurchschnittliche Verwaltungskosten. Effizienz gewinnen heisst Bürokratie abbauen, nicht Leistung kürzen.",
+  slug: "gesundheitskosten-verwaltung",
+  category: "langforschung",
+  evidence: "stark",
+  tags: ["gesundheit", "life-science", "kosten", "verwaltung", "vergleich"],
+  charts: ["gesundheitsausgaben_kategorien.svg", "gesundheitsausgaben_vergleich.svg", "gesundheitsausgaben_verwaltung.svg"],
+  summary: """
+  Die Schweiz erreicht eine Lebenserwartung von 84.0 Jahren (Top 5 weltweit),
+  gibt aber CHF 7'138 pro Kopf aus. Der Verwaltungsanteil von 5.2% übersteigt
+  den OECD-Schnitt (3.5%) deutlich — ein Indikator für Systemkomplexität, nicht
+  für bessere Versorgung.
+  """,
+  body: """
+  ## Methodik
+
+  Die Kostenanalyse basiert auf der BFS/BAG-Statistik der obligatorischen
+  Krankenversicherung (Gesundheitsausgaben nach Leistungsart, 2010–2022).
+  Der internationale Vergleich nutzt OECD Health at a Glance 2023 (Ausgaben
+  pro Kopf in KKP-USD, Lebenserwartung, Verwaltungskostenanteile).
+
+  ## Ergebnisse
+
+  ![Ausgaben nach Kategorie](/zukunftslabor/charts/gesundheitsausgaben_kategorien.svg)
+
+  ![Ausgaben vs. Lebenserwartung](/zukunftslabor/charts/gesundheitsausgaben_vergleich.svg)
+
+  ![Verwaltungskosten im Vergleich](/zukunftslabor/charts/gesundheitsausgaben_verwaltung.svg)
+
+  ## Politische Einordnung
+
+  Das Schweizer Gesundheitssystem liefert — aber es liefert teuer. Die hohen
+  Verwaltungskosten sind kein Naturgesetz, sondern Ergebnis eines fragmentierten
+  Systems (26 Kantone, 50+ Versicherer, komplexe Tarifstrukturen). Digitale
+  Patientendossiers, standardisierte Abrechnungen und Transparenz über Kosten
+  und Qualität würden die Verwaltungslast senken, ohne die Versorgung zu
+  verschlechtern.
+
+  ## Datenquellen
+
+  - BFS/BAG: Kosten und Finanzierung des Gesundheitswesens (2010–2022)
+  - OECD Health at a Glance 2023: Ausgaben, Lebenserwartung, Verwaltungskosten
+  """
+)
+```

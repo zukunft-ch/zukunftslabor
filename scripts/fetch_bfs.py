@@ -139,6 +139,16 @@ def fetch_download(name: str, dataset: dict):
         process_einkommensverteilung(raw_path, output)
     elif name == "mietzinse_kantone":
         process_mietzinse(raw_path, output)
+    elif name == "forschung_ausgaben":
+        process_forschung_ausgaben(raw_path, output)
+    elif name == "energieverbrauch_sektor":
+        process_energieverbrauch(raw_path, output)
+    elif name == "gesundheitsausgaben":
+        process_gesundheitsausgaben(raw_path, output)
+    elif name == "wanderungen":
+        process_wanderungen(raw_path, output)
+    elif name == "verteidigungsausgaben":
+        process_verteidigungsausgaben(raw_path, output)
     else:
         print(f"  Note: no auto-processor for '{name}', raw file saved only")
 
@@ -291,6 +301,311 @@ def process_mietzinse(raw_path: Path, output: Path):
 
     years = sorted(set(r["Jahr"] for r in rows))
     print(f"  Processed {len(rows)} rows, years {years[0]}–{years[-1]} → {output}")
+
+
+def process_forschung_ausgaben(raw_path: Path, output: Path):
+    """Process BFS R&D expenditure XLSX → sector × year CSV."""
+    import openpyxl
+
+    wb = openpyxl.load_workbook(raw_path, data_only=True)
+    rows = []
+
+    for ws in wb.worksheets:
+        # Try to find year in sheet title or first cells
+        year = None
+        title = ws.title.strip()
+        for token in title.split():
+            try:
+                y = int(token)
+                if 1990 <= y <= 2030:
+                    year = y
+                    break
+            except ValueError:
+                continue
+
+        if year is None:
+            # Try cell A1 or A2
+            for r in range(1, 5):
+                val = ws.cell(row=r, column=1).value
+                if val and isinstance(val, (int, float)) and 1990 <= int(val) <= 2030:
+                    year = int(val)
+                    break
+
+        if year is None:
+            continue
+
+        # Scan for sector rows with expenditure values
+        for r in range(1, ws.max_row + 1):
+            label = ws.cell(row=r, column=1).value
+            val = ws.cell(row=r, column=2).value
+            if label and isinstance(label, str) and val and isinstance(val, (int, float)):
+                label = label.strip()
+                if label and not label.startswith("[") and val > 0:
+                    rows.append({
+                        "Jahr": year,
+                        "Sektor": label,
+                        "Ausgaben_Mio_CHF": round(float(val)),
+                    })
+
+    rows.sort(key=lambda x: (-x["Jahr"], -x["Ausgaben_Mio_CHF"]))
+
+    with open(output, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["Jahr", "Sektor", "Ausgaben_Mio_CHF"])
+        writer.writeheader()
+        writer.writerows(rows)
+
+    if rows:
+        years = sorted(set(r["Jahr"] for r in rows))
+        print(f"  Processed {len(rows)} rows, years {years[0]}–{years[-1]} → {output}")
+    else:
+        print(f"  Warning: no data rows extracted → {output}")
+
+
+def process_energieverbrauch(raw_path: Path, output: Path):
+    """Process BFS energy consumption XLSX → sector × year CSV."""
+    import openpyxl
+
+    wb = openpyxl.load_workbook(raw_path, data_only=True)
+    rows = []
+
+    for ws in wb.worksheets:
+        year = None
+        title = ws.title.strip()
+        for token in title.split():
+            try:
+                y = int(token)
+                if 1990 <= y <= 2030:
+                    year = y
+                    break
+            except ValueError:
+                continue
+
+        if year is None:
+            for r in range(1, 5):
+                val = ws.cell(row=r, column=1).value
+                if val and isinstance(val, (int, float)) and 1990 <= int(val) <= 2030:
+                    year = int(val)
+                    break
+
+        if year is None:
+            continue
+
+        for r in range(1, ws.max_row + 1):
+            label = ws.cell(row=r, column=1).value
+            val = ws.cell(row=r, column=2).value
+            if label and isinstance(label, str) and val and isinstance(val, (int, float)):
+                label = label.strip()
+                if label and not label.startswith("[") and val > 0:
+                    rows.append({
+                        "Jahr": year,
+                        "Sektor": label,
+                        "Verbrauch_TJ": round(float(val)),
+                    })
+
+    rows.sort(key=lambda x: (-x["Jahr"], -x["Verbrauch_TJ"]))
+
+    with open(output, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["Jahr", "Sektor", "Verbrauch_TJ"])
+        writer.writeheader()
+        writer.writerows(rows)
+
+    if rows:
+        years = sorted(set(r["Jahr"] for r in rows))
+        print(f"  Processed {len(rows)} rows, years {years[0]}–{years[-1]} → {output}")
+    else:
+        print(f"  Warning: no data rows extracted → {output}")
+
+
+def process_gesundheitsausgaben(raw_path: Path, output: Path):
+    """Process BFS healthcare expenditure XLSX → category × year CSV."""
+    import openpyxl
+
+    wb = openpyxl.load_workbook(raw_path, data_only=True)
+    rows = []
+
+    for ws in wb.worksheets:
+        year = None
+        title = ws.title.strip()
+        for token in title.split():
+            try:
+                y = int(token)
+                if 1990 <= y <= 2030:
+                    year = y
+                    break
+            except ValueError:
+                continue
+
+        if year is None:
+            for r in range(1, 5):
+                val = ws.cell(row=r, column=1).value
+                if val and isinstance(val, (int, float)) and 1990 <= int(val) <= 2030:
+                    year = int(val)
+                    break
+
+        if year is None:
+            continue
+
+        for r in range(1, ws.max_row + 1):
+            label = ws.cell(row=r, column=1).value
+            val = ws.cell(row=r, column=2).value
+            if label and isinstance(label, str) and val and isinstance(val, (int, float)):
+                label = label.strip()
+                if label and not label.startswith("[") and val > 0:
+                    rows.append({
+                        "Jahr": year,
+                        "Kategorie": label,
+                        "Ausgaben_Mio_CHF": round(float(val)),
+                    })
+
+    rows.sort(key=lambda x: (-x["Jahr"], -x["Ausgaben_Mio_CHF"]))
+
+    with open(output, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["Jahr", "Kategorie", "Ausgaben_Mio_CHF"])
+        writer.writeheader()
+        writer.writerows(rows)
+
+    if rows:
+        years = sorted(set(r["Jahr"] for r in rows))
+        print(f"  Processed {len(rows)} rows, years {years[0]}–{years[-1]} → {output}")
+    else:
+        print(f"  Warning: no data rows extracted → {output}")
+
+
+def process_wanderungen(raw_path: Path, output: Path):
+    """Process BFS migration flows XLSX → flat CSV with type, nationality, year."""
+    import openpyxl
+
+    wb = openpyxl.load_workbook(raw_path, data_only=True)
+    rows = []
+
+    for ws in wb.worksheets:
+        year = None
+        title = ws.title.strip()
+        for token in title.split():
+            try:
+                y = int(token)
+                if 1990 <= y <= 2030:
+                    year = y
+                    break
+            except ValueError:
+                continue
+
+        if year is None:
+            for r in range(1, 5):
+                val = ws.cell(row=r, column=1).value
+                if val and isinstance(val, (int, float)) and 1990 <= int(val) <= 2030:
+                    year = int(val)
+                    break
+
+        if year is None:
+            continue
+
+        for r in range(1, ws.max_row + 1):
+            label = ws.cell(row=r, column=1).value
+            einwanderung = ws.cell(row=r, column=2).value
+            auswanderung = ws.cell(row=r, column=3).value
+            if label and isinstance(label, str):
+                label = label.strip()
+                if not label or label.startswith("["):
+                    continue
+                if einwanderung and isinstance(einwanderung, (int, float)):
+                    rows.append({
+                        "Jahr": year,
+                        "Nationalitaet": label,
+                        "Typ": "Einwanderung",
+                        "Personen": round(float(einwanderung)),
+                    })
+                if auswanderung and isinstance(auswanderung, (int, float)):
+                    rows.append({
+                        "Jahr": year,
+                        "Nationalitaet": label,
+                        "Typ": "Auswanderung",
+                        "Personen": round(float(auswanderung)),
+                    })
+
+    rows.sort(key=lambda x: (-x["Jahr"], x["Typ"], -x["Personen"]))
+
+    with open(output, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["Jahr", "Nationalitaet", "Typ", "Personen"])
+        writer.writeheader()
+        writer.writerows(rows)
+
+    if rows:
+        years = sorted(set(r["Jahr"] for r in rows))
+        print(f"  Processed {len(rows)} rows, years {years[0]}–{years[-1]} → {output}")
+    else:
+        print(f"  Warning: no data rows extracted → {output}")
+
+
+def process_verteidigungsausgaben(raw_path: Path, output: Path):
+    """Process World Bank military spending CSV (from ZIP) → flat CSV."""
+    import zipfile
+    import io
+
+    # World Bank API returns a ZIP with CSVs
+    rows = []
+
+    try:
+        with zipfile.ZipFile(raw_path) as zf:
+            # Find the data CSV (not the metadata one)
+            csv_names = [n for n in zf.namelist() if n.endswith(".csv") and "Metadata" not in n]
+            if not csv_names:
+                csv_names = [n for n in zf.namelist() if n.endswith(".csv")]
+            if not csv_names:
+                print(f"  Warning: no CSV found in ZIP → {raw_path}")
+                return
+
+            with zf.open(csv_names[0]) as cf:
+                text = io.TextIOWrapper(cf, encoding="utf-8-sig")
+                reader = csv.DictReader(text)
+                for row in reader:
+                    country = row.get("Country Name", "")
+                    code = row.get("Country Code", "")
+                    # Year columns are named as strings like "2000", "2001", etc.
+                    for year_str in range(2000, 2024):
+                        val = row.get(str(year_str), "")
+                        if val and val.strip():
+                            try:
+                                rows.append({
+                                    "Land": country,
+                                    "Code": code,
+                                    "Jahr": year_str,
+                                    "Anteil_BIP_Prozent": round(float(val), 3),
+                                })
+                            except ValueError:
+                                pass
+    except zipfile.BadZipFile:
+        # Not a ZIP — try as plain CSV
+        with open(raw_path, "r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                country = row.get("Country Name", row.get("country", ""))
+                code = row.get("Country Code", row.get("countryiso3code", ""))
+                val = row.get("value", row.get("Value", ""))
+                year_str = row.get("date", row.get("Year", ""))
+                if val and val.strip() and year_str:
+                    try:
+                        rows.append({
+                            "Land": country,
+                            "Code": code,
+                            "Jahr": int(year_str),
+                            "Anteil_BIP_Prozent": round(float(val), 3),
+                        })
+                    except ValueError:
+                        pass
+
+    rows.sort(key=lambda x: (x["Land"], -x["Jahr"]))
+
+    with open(output, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["Land", "Code", "Jahr", "Anteil_BIP_Prozent"])
+        writer.writeheader()
+        writer.writerows(rows)
+
+    if rows:
+        countries = sorted(set(r["Land"] for r in rows))
+        print(f"  Processed {len(rows)} rows, {len(countries)} countries → {output}")
+    else:
+        print(f"  Warning: no data rows extracted → {output}")
 
 
 # ── Main ─────────────────────────────────────────────────────────────

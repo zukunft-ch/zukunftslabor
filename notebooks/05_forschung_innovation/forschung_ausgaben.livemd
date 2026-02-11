@@ -1,0 +1,221 @@
+# Forschung & Innovation
+
+```elixir
+Mix.install([
+  {:explorer, "~> 0.11"},
+  {:vega_lite, "~> 0.1"},
+  {:kino_vega_lite, "~> 0.1"},
+  {:kino_explorer, "~> 0.1"},
+  {:kino, "~> 0.14"},
+  {:jason, "~> 1.4"},
+  {:vega_lite_convert, "~> 1.0"},
+  {:toml, "~> 0.7"},
+  {:req, "~> 0.5"}
+])
+
+# When running attached to the project, these are already available.
+# Mix.install is for standalone LiveBook usage.
+```
+
+## Fragestellung
+
+> Wie viel investiert die Schweiz in Forschung — und wer profitiert?
+
+**Kategorie**: Datenbriefing
+**Evidenzstärke**: stark (amtliche BFS-Forschungsstatistik + OECD GERD)
+
+## Daten laden
+
+```elixir
+alias Explorer.DataFrame, as: DF
+alias Explorer.Series
+
+# Load R&D expenditure by sector
+# Columns: Jahr (s64), Sektor (string), Ausgaben_Mio_CHF (f64)
+df_rd = Zukunftslabor.DataLoader.load("forschung_ausgaben")
+```
+
+## Analyse: F&E-Ausgaben nach Sektor
+
+```elixir
+alias VegaLite, as: Vl
+
+# Latest year data — R&D spending by sector
+latest_year =
+  df_rd
+  |> DF.pull("Jahr")
+  |> Series.max()
+
+df_latest =
+  df_rd
+  |> DF.filter(col("Jahr") == ^latest_year)
+  |> DF.sort_by(desc: col("Ausgaben_Mio_CHF"))
+
+sector_data =
+  df_latest
+  |> DF.to_rows()
+  |> Enum.map(fn row ->
+    %{"Sektor" => row["Sektor"], "Ausgaben (Mio. CHF)" => row["Ausgaben_Mio_CHF"]}
+  end)
+
+chart_sectors =
+  Vl.new(width: 720, height: 400, title: "F&E-Ausgaben nach Sektor — Schweiz (#{latest_year})")
+  |> Vl.data_from_values(sector_data)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Sektor", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Ausgaben (Mio. CHF)", type: :quantitative, title: "Mio. CHF")
+  |> Vl.encode(:color, value: "#a855f7")
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Internationaler Vergleich: F&E-Intensität
+
+```elixir
+# OECD GERD data — R&D expenditure as % of GDP (manually curated)
+# Source: OECD Main Science and Technology Indicators 2023
+oecd_data = [
+  %{"Land" => "Israel", "F&E_BIP" => 5.56, "BIP_pro_Kopf" => 54_660},
+  %{"Land" => "Südkorea", "F&E_BIP" => 4.93, "BIP_pro_Kopf" => 50_490},
+  %{"Land" => "Schweden", "F&E_BIP" => 3.40, "BIP_pro_Kopf" => 60_240},
+  %{"Land" => "Schweiz", "F&E_BIP" => 3.36, "BIP_pro_Kopf" => 93_260},
+  %{"Land" => "USA", "F&E_BIP" => 3.46, "BIP_pro_Kopf" => 76_330},
+  %{"Land" => "Deutschland", "F&E_BIP" => 3.13, "BIP_pro_Kopf" => 51_380},
+  %{"Land" => "Österreich", "F&E_BIP" => 3.20, "BIP_pro_Kopf" => 56_800},
+  %{"Land" => "OECD-Durchschnitt", "F&E_BIP" => 2.71, "BIP_pro_Kopf" => 47_000}
+]
+
+chart_oecd =
+  Vl.new(width: 720, height: 400, title: "F&E-Ausgaben (% BIP) vs. BIP pro Kopf — Internationaler Vergleich")
+  |> Vl.data_from_values(oecd_data)
+  |> Vl.mark(:point, size: 120, filled: true)
+  |> Vl.encode_field(:x, "BIP_pro_Kopf",
+    type: :quantitative,
+    title: "BIP pro Kopf (USD, KKP)",
+    scale: [domain: [40_000, 100_000]]
+  )
+  |> Vl.encode_field(:y, "F&E_BIP",
+    type: :quantitative,
+    title: "F&E-Ausgaben (% des BIP)",
+    scale: [domain: [2.0, 6.0]]
+  )
+  |> Vl.encode_field(:color, "Land",
+    type: :nominal,
+    scale: [
+      domain: ["Schweiz", "OECD-Durchschnitt", "Israel", "Südkorea", "USA", "Schweden", "Deutschland", "Österreich"],
+      range: ["#a855f7", "#6b7280", "#06b6d4", "#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"]
+    ]
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## F&E-Ausgaben im Zeitverlauf
+
+```elixir
+# Trend over time — total R&D spending
+# Aggregate all sectors per year
+yearly_totals =
+  df_rd
+  |> DF.group_by("Jahr")
+  |> DF.summarise(Total: sum(col("Ausgaben_Mio_CHF")))
+  |> DF.to_rows()
+  |> Enum.map(fn row -> %{"Jahr" => row["Jahr"], "Total (Mio. CHF)" => row["Total"]} end)
+  |> Enum.sort_by(& &1["Jahr"])
+
+chart_trend =
+  Vl.new(width: 720, height: 300, title: "F&E-Gesamtausgaben Schweiz im Zeitverlauf")
+  |> Vl.data_from_values(yearly_totals)
+  |> Vl.mark(:line, point: true, stroke_width: 2)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "Total (Mio. CHF)", type: :quantitative, title: "Mio. CHF")
+  |> Vl.encode(:color, value: "#a855f7")
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Kernaussage
+
+```elixir
+total_rd = if length(yearly_totals) > 0, do: List.last(yearly_totals)["Total (Mio. CHF)"], else: 0
+
+private_share =
+  df_latest
+  |> DF.to_rows()
+  |> Enum.reduce({0, 0}, fn row, {priv, total} ->
+    is_private = String.contains?(String.downcase(row["Sektor"]), "privat") or
+                 String.contains?(String.downcase(row["Sektor"]), "unternehmen") or
+                 String.contains?(String.downcase(row["Sektor"]), "wirtschaft")
+    total_new = total + row["Ausgaben_Mio_CHF"]
+    priv_new = if is_private, do: priv + row["Ausgaben_Mio_CHF"], else: priv
+    {priv_new, total_new}
+  end)
+
+{priv_total, all_total} = private_share
+priv_pct = if all_total > 0, do: round(priv_total / all_total * 100), else: 0
+
+Kino.Markdown.new("""
+### Kernaussage
+
+Die Schweiz investiert rund **#{round(total_rd / 1000, 1)} Mrd. CHF** jährlich in Forschung
+und Entwicklung — das entspricht ca. **3.4% des BIP** und platziert die Schweiz
+unter den Top 5 weltweit.
+
+Rund **#{priv_pct}%** der F&E-Ausgaben stammen aus der Privatwirtschaft. Der
+öffentliche Beitrag (Hochschulen + Bund) ist substantiell, aber die Frage bleibt:
+Was kommt als öffentlicher Ertrag zurück? Die Partei fordert «Innovation als
+Commons» — Wissen, das mit öffentlichen Mitteln entsteht, soll öffentlich
+zugänglich sein.
+""")
+```
+
+## Export
+
+```elixir
+Zukunftslabor.ChartExport.to_svg(chart_sectors, name: "forschung_ausgaben_sektor")
+Zukunftslabor.ChartExport.to_svg(chart_oecd, name: "forschung_internationaler_vergleich")
+Zukunftslabor.ChartExport.to_svg(chart_trend, name: "forschung_ausgaben_zeitreihe")
+
+Zukunftslabor.NotizTemplate.generate(
+  title: "3.4% des BIP für Forschung — aber wem gehört das Wissen?",
+  description: "Die Schweiz gehört bei F&E-Ausgaben zur Weltspitze, doch zwei Drittel kommen aus der Privatwirtschaft. Der öffentliche Ertrag aus öffentlicher Forschung bleibt eine offene Frage.",
+  slug: "forschung-innovation-ausgaben",
+  category: "datenbriefing",
+  evidence: "stark",
+  tags: ["forschung", "innovation", "commons", "oecd", "f-und-e"],
+  charts: ["forschung_ausgaben_sektor.svg", "forschung_internationaler_vergleich.svg", "forschung_ausgaben_zeitreihe.svg"],
+  summary: """
+  Die Schweiz investiert rund #{round(total_rd / 1000, 1)} Mrd. CHF (ca. 3.4% des BIP)
+  in Forschung und Entwicklung — Top 5 weltweit. Aber #{priv_pct}% stammen aus der
+  Privatwirtschaft. Die Frage, was als öffentlicher Ertrag aus öffentlich
+  finanzierter Forschung zurückfliesst, ist politisch unbeantwortet.
+  """,
+  body: """
+  ## Methodik
+
+  Grundlage sind die BFS-Forschungsstatistik (F&E-Aufwendungen nach Sektor) und
+  die OECD Main Science and Technology Indicators (GERD als % des BIP). Die
+  Sektorzuordnung folgt dem Frascati-Manual: Privatwirtschaft, Hochschulen,
+  Bund/öffentliche Hand, private Organisationen ohne Erwerbszweck.
+
+  ## Ergebnisse
+
+  ![F&E-Ausgaben nach Sektor](/zukunftslabor/charts/forschung_ausgaben_sektor.svg)
+
+  ![Internationaler Vergleich](/zukunftslabor/charts/forschung_internationaler_vergleich.svg)
+
+  ![Zeitreihe](/zukunftslabor/charts/forschung_ausgaben_zeitreihe.svg)
+
+  ## Politische Einordnung
+
+  Die hohe F&E-Intensität der Schweiz ist eine Stärke — aber der hohe
+  Privatanteil wirft Fragen auf: Öffentlich finanzierte Grundlagenforschung
+  (ETH, Universitäten, SNF) erzeugt Wissen, das oft von privaten Akteuren
+  kommerzialisiert wird. «Innovation als Commons» bedeutet: Open Access,
+  öffentliche Datensätze und faire Lizenzbedingungen für öffentlich
+  finanzierte Forschung.
+
+  ## Datenquellen
+
+  - BFS: Forschung und Entwicklung — Aufwendungen (2004–2021)
+  - OECD Main Science and Technology Indicators 2023
+  """
+)
+```
