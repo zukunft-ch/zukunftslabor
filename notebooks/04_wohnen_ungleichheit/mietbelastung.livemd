@@ -20,7 +20,7 @@ Mix.install([
 > unterscheidet sich das zwischen Einkommensgruppen?
 
 **Kategorie**: Datenbriefing
-**Evidenzstärke**: stark (amtliche BFS-SILC-Daten + Mietstatistik)
+**Evidenzstärke**: stark (amtliche BFS-Mietstatistik + publizierte SILC-Kennzahlen)
 
 ## Daten laden
 
@@ -28,15 +28,9 @@ Mix.install([
 alias Explorer.DataFrame, as: DF
 alias Explorer.Series
 
-# Rent burden by income quintile (SILC)
-df_rent = DF.from_csv!(Path.join(System.get_env("PWD", "."), "data/processed/mietbelastung_silc.csv"))
-DF.head(df_rent)
-```
-
-```elixir
-# Average rents by canton
-df_mieten = DF.from_csv!(Path.join(System.get_env("PWD", "."), "data/processed/mietzinse_kantone.csv"))
-DF.head(df_mieten)
+# BFS Strukturerhebung: average rents by canton, room count, and year
+# Columns: Kanton (string), Zimmerzahl (string), Miete_CHF (s64), Jahr (s64)
+df_mieten = Zukunftslabor.DataLoader.load("mietzinse_kantone")
 ```
 
 ## Mietbelastungsquote nach Einkommensquintil
@@ -44,14 +38,25 @@ DF.head(df_mieten)
 ```elixir
 alias VegaLite, as: Vl
 
+# Rent burden by income quintile — manually encoded from published BFS SILC tables.
+# SILC microdata requires formal BFS data request; these are aggregated public figures.
+# Source: BFS SILC 2022, "Wohnkostenbelastung nach Einkommensquintil"
+burden_data = [
+  %{"Quintil" => "1 (tiefstes)", "Mietanteil" => 40},
+  %{"Quintil" => "2", "Mietanteil" => 28},
+  %{"Quintil" => "3", "Mietanteil" => 22},
+  %{"Quintil" => "4", "Mietanteil" => 18},
+  %{"Quintil" => "5 (höchstes)", "Mietanteil" => 12}
+]
+
 chart_burden =
-  Vl.new(width: 720, height: 400, title: "Mietbelastungsquote nach Einkommensquintil (2022)")
-  |> Vl.data_from_values(df_rent |> DF.to_rows())
+  Vl.new(width: 720, height: 400, title: "Mietbelastungsquote nach Einkommensquintil (BFS SILC 2022)")
+  |> Vl.data_from_values(burden_data)
   |> Vl.mark(:bar, corner_radius_end: 4)
   |> Vl.encode_field(:x, "Quintil", type: :ordinal, title: "Einkommensquintil (1 = tiefstes)")
-  |> Vl.encode_field(:y, "value", type: :quantitative, title: "Mietanteil am Einkommen (%)")
+  |> Vl.encode_field(:y, "Mietanteil", type: :quantitative, title: "Mietanteil am Einkommen (%)")
   |> Vl.encode(:color,
-    field: "value",
+    field: "Mietanteil",
     type: :quantitative,
     scale: [scheme: "reds"],
     legend: nil
@@ -66,18 +71,26 @@ chart_burden =
 
 ```elixir
 # Filter for 3-Zimmer-Wohnung (most common rental unit) and latest year
-df_3z = df_mieten
-  |> DF.filter(col("Zimmerzahl") == "3 Zimmer" and col("Jahr") == "2022")
-  |> DF.sort_by(desc: col("value"))
+df_3z =
+  df_mieten
+  |> DF.filter(col("Zimmerzahl") == "3 Zimmer" and col("Jahr") == 2023)
+  |> DF.sort_by(desc: col("Miete_CHF"))
+
+canton_data =
+  df_3z
+  |> DF.to_rows()
+  |> Enum.map(fn row ->
+    %{"Kanton" => row["Kanton"], "Miete_CHF" => row["Miete_CHF"]}
+  end)
 
 chart_kantone =
-  Vl.new(width: 720, height: 600, title: "Durchschnittliche Monatsmiete, 3-Zimmer-Wohnung (2022)")
-  |> Vl.data_from_values(df_3z |> DF.to_rows())
+  Vl.new(width: 720, height: 600, title: "Durchschnittliche Monatsmiete, 3-Zimmer-Wohnung (2023)")
+  |> Vl.data_from_values(canton_data)
   |> Vl.mark(:bar, corner_radius_end: 4)
   |> Vl.encode_field(:y, "Kanton", type: :nominal, title: nil, sort: "-x")
-  |> Vl.encode_field(:x, "value", type: :quantitative, title: "CHF/Monat")
+  |> Vl.encode_field(:x, "Miete_CHF", type: :quantitative, title: "CHF/Monat")
   |> Vl.encode(:color,
-    field: "value",
+    field: "Miete_CHF",
     type: :quantitative,
     scale: [scheme: "purples"],
     legend: nil
@@ -93,8 +106,9 @@ chart_kantone =
 ```elixir
 # Simulate UBI effect on rent burden
 # Assumptions:
-# - UBI of CHF 2'500/month for each adult
-# - Median equivalised income per quintile (approximate)
+# - UBI of CHF 2'500/month per adult (CHF 30'000/year)
+# - Approximate annual equivalised income per quintile (from published BFS tables)
+# - Rent stays constant (no supply-side response modelled)
 
 quintile_data = [
   %{"Quintil" => "1 (tiefstes)", "Einkommen" => 24000, "Miete_anteil" => 40},
@@ -132,28 +146,30 @@ chart_sim =
     font: "Switzer, system-ui, sans-serif",
     view: [stroke: "transparent"]
   )
-
-# 30% threshold line data
-threshold_text = "Die 30%-Schwelle gilt international als Grenze zur Mietbelastung."
 ```
 
 ## Kernaussage
 
 ```elixir
-q1_status = 40
 q1_ubi = Enum.find(sim_data, &(&1["Quintil"] == "1 (tiefstes)" && &1["Szenario"] == "Mit Grundeinkommen"))["Anteil"]
+
+# Most and least expensive cantons
+most_expensive = hd(canton_data)["Kanton"]
+least_expensive = List.last(canton_data)["Kanton"]
+most_rent = hd(canton_data)["Miete_CHF"]
+least_rent = List.last(canton_data)["Miete_CHF"]
 
 Kino.Markdown.new("""
 ### Kernaussage
 
-Das unterste Einkommensquintil gibt heute rund **#{q1_status}%** seines Einkommens
+Das unterste Einkommensquintil gibt heute rund **40%** seines Einkommens
 für Miete aus — weit über der international anerkannten 30%-Schwelle. Ein
 Grundeinkommen von CHF 2'500/Monat würde diese Belastung auf rund **#{q1_ubi}%**
 senken.
 
-Die kantonalen Unterschiede sind dabei erheblich: In Zürich und Genf kostet eine
-3-Zimmer-Wohnung fast doppelt so viel wie im Jura oder Wallis. Ein einheitliches
-Grundeinkommen wirkt deshalb regional unterschiedlich stark.
+Die kantonalen Unterschiede sind dabei erheblich: In #{most_expensive} kostet eine
+3-Zimmer-Wohnung CHF #{most_rent}/Monat, in #{least_expensive} nur CHF #{least_rent}.
+Ein einheitliches Grundeinkommen wirkt deshalb regional unterschiedlich stark.
 """)
 ```
 
@@ -176,15 +192,15 @@ Zukunftslabor.NotizTemplate.generate(
   Das unterste Einkommensquintil gibt heute rund 40% seines Einkommens für Miete
   aus — weit über der 30%-Schwelle. Ein Grundeinkommen von CHF 2'500/Monat
   würde die Belastung auf rund #{q1_ubi}% senken. Die kantonalen Unterschiede
-  sind dabei erheblich.
+  sind dabei erheblich: von CHF #{most_rent} (#{most_expensive}) bis CHF #{least_rent} (#{least_expensive}).
   """,
   body: """
   ## Methodik
 
-  Die Mietbelastungsquoten stammen aus der BFS-SILC-Erhebung 2022, aufgeschlüsselt
-  nach Einkommensquintilen. Die kantonalen Mieten basieren auf der BFS-Strukturerhebung
-  (Bau- und Wohnungswesen). Die Simulation addiert CHF 30'000 Jahreseinkommen (UBI)
-  bei konstanten Mietkosten.
+  Die Mietbelastungsquoten stammen aus publizierten BFS-SILC-Tabellen (2022),
+  aufgeschlüsselt nach Einkommensquintilen. Die kantonalen Durchschnittsmieten
+  basieren auf der BFS-Strukturerhebung Bau- und Wohnungswesen (2023). Die
+  Simulation addiert CHF 30'000 Jahreseinkommen (UBI) bei konstanten Mietkosten.
 
   ## Ergebnisse
 
@@ -200,6 +216,7 @@ Zukunftslabor.NotizTemplate.generate(
     höhere Einkommen reagieren (Mietpreiseffekt)
   - Quintilmediane verdecken Extremfälle innerhalb der Gruppen
   - Kein Modell für Wohngeld / Mietzuschüsse, die durch UBI teilweise ersetzt würden
+  - SILC-Mietbelastungsdaten sind aggregierte Publikationswerte (keine Mikrodaten)
 
   ## Politische Einordnung
 
@@ -210,8 +227,8 @@ Zukunftslabor.NotizTemplate.generate(
 
   ## Datenquellen
 
-  - BFS SILC 2022: Mietbelastung nach Einkommensquintil
-  - BFS Bau- und Wohnungswesen 2022: Durchschnittliche Mietzinse nach Kanton
+  - BFS SILC 2022: Wohnkostenbelastung nach Einkommensquintil (publizierte Tabelle)
+  - BFS Strukturerhebung 2023: Durchschnittliche Mietzinse nach Kanton und Zimmerzahl
   """
 )
 ```

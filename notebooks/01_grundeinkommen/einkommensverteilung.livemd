@@ -31,15 +31,63 @@ Mix.install([
 alias Explorer.DataFrame, as: DF
 alias Explorer.Series
 
-# Load income distribution by decile (SILC)
-df_income = DF.from_csv!(Path.join(System.get_env("PWD", "."), "data/processed/einkommensverteilung_silc.csv"))
-DF.head(df_income)
+# Load income distribution (HABE/SILC)
+# Columns: Jahr (s64), Kennzahl (string), Wert (f64)
+# Kennzahl values: Dezil_1_Anteil_Prozent..Dezil_10_Anteil_Prozent,
+#   Gini_Koeffizient, Median_CHF_Monat, Mittelwert_CHF_Monat
+df_all = Zukunftslabor.DataLoader.load("einkommensverteilung_silc")
 ```
 
 ```elixir
-# Load social security transfers
-df_transfers = DF.from_csv!(Path.join(System.get_env("PWD", "."), "data/processed/soziale_sicherheit_transfers.csv"))
-DF.head(df_transfers)
+# Use latest year (2018)
+df_2018 = df_all |> DF.filter(col("Jahr") == 2018)
+
+# Extract decile shares for 2018
+df_deciles =
+  df_2018
+  |> DF.filter(contains(col("Kennzahl"), "Dezil"))
+  |> DF.mutate(
+    Dezil: cast(substring(col("Kennzahl"), 6, 1), :integer) |> add(
+      cast(substring(col("Kennzahl"), 7, 1), :integer) |> fill_missing(0) |> multiply(
+        cast(equal(substring(col("Kennzahl"), 7, 1), "0"), :integer) |> subtract(1) |> multiply(-1) |> multiply(9)
+      )
+    )
+  )
+
+# Simpler approach: extract decile number from Kennzahl string
+decile_rows =
+  df_2018
+  |> DF.filter(contains(col("Kennzahl"), "Dezil"))
+  |> DF.to_rows()
+  |> Enum.map(fn row ->
+    # "Dezil_1_Anteil_Prozent" → 1, "Dezil_10_Anteil_Prozent" → 10
+    dezil = row["Kennzahl"]
+      |> String.replace("Dezil_", "")
+      |> String.replace("_Anteil_Prozent", "")
+      |> String.to_integer()
+    %{"Dezil" => dezil, "Anteil" => row["Wert"]}
+  end)
+  |> Enum.sort_by(& &1["Dezil"])
+
+# Extract Gini and median
+gini_sq =
+  df_2018
+  |> DF.filter(col("Kennzahl") == "Gini_Koeffizient")
+  |> DF.pull("Wert")
+  |> Series.to_list()
+  |> hd()
+
+median_monthly =
+  df_2018
+  |> DF.filter(col("Kennzahl") == "Median_CHF_Monat")
+  |> DF.pull("Wert")
+  |> Series.to_list()
+  |> hd()
+  |> round()
+
+IO.puts("Gini (2018): #{gini_sq}")
+IO.puts("Median (2018): CHF #{median_monthly}/Monat")
+IO.puts("Decile shares: #{inspect(Enum.map(decile_rows, & &1["Anteil"]))}")
 ```
 
 ## Analyse: Einkommensverteilung nach Dezilen
@@ -47,16 +95,14 @@ DF.head(df_transfers)
 ```elixir
 alias VegaLite, as: Vl
 
-# Bar chart: disposable income by decile
+# Bar chart: income share by decile
 chart_deciles =
-  Vl.new(width: 720, height: 400, title: "Verfügbares Äquivalenzeinkommen nach Dezil (2022)")
-  |> Vl.data_from_values(df_income |> DF.to_rows())
+  Vl.new(width: 720, height: 400, title: "Einkommensanteile nach Dezil — Verfügbares Äquivalenzeinkommen (2018)")
+  |> Vl.data_from_values(decile_rows)
   |> Vl.mark(:bar, corner_radius_end: 4)
   |> Vl.encode_field(:x, "Dezil", type: :ordinal, title: "Einkommensdezil")
-  |> Vl.encode_field(:y, "value", type: :quantitative, title: "CHF/Jahr")
-  |> Vl.encode(:color,
-    value: "#a855f7"
-  )
+  |> Vl.encode_field(:y, "Anteil", type: :quantitative, title: "Anteil am Gesamteinkommen (%)")
+  |> Vl.encode(:color, value: "#a855f7")
   |> Vl.config(
     font: "Switzer, system-ui, sans-serif",
     view: [stroke: "transparent"]
@@ -68,37 +114,48 @@ chart_deciles =
 ```elixir
 # UBI parameters
 ubi_monthly = 2500
-ubi_annual = ubi_monthly * 12
 
-# Simplified microsimulation on decile medians:
-# 1. Add UBI to each decile's disposable income
-# 2. Subtract estimated existing transfers that UBI replaces
-# 3. Apply flat financing (proportional tax on income above UBI)
+# Income shares are percentages of total income.
+# A flat UBI shifts income toward lower deciles because it's a larger
+# proportion of their existing income.
+#
+# Approach: estimate absolute monthly income per decile from shares + median,
+# add UBI, recalculate shares.
 
-# This is a rough approximation — real microsimulation needs individual-level data
+# Approximate absolute income per decile using shares and total
+# Total monthly income = mean × 10 (for 10 deciles of equal population)
+mean_monthly =
+  df_2018
+  |> DF.filter(col("Kennzahl") == "Mittelwert_CHF_Monat")
+  |> DF.pull("Wert")
+  |> Series.to_list()
+  |> hd()
 
-df_sim =
-  df_income
-  |> DF.mutate(
-    income_with_ubi: Series.add(col("value"), ^ubi_annual),
-    ubi_amount: ^ubi_annual
-  )
+# Each decile's average monthly income ≈ share% × mean × 10
+# (share is % of total, decile is 10% of population)
+decile_incomes = Enum.map(decile_rows, fn row ->
+  monthly = row["Anteil"] / 100 * mean_monthly * 10
+  %{
+    "Dezil" => row["Dezil"],
+    "Einkommen_Status_quo" => round(monthly),
+    "Einkommen_mit_UBI" => round(monthly + ubi_monthly)
+  }
+end)
+
+# Build comparison data for grouped bar chart
+comparison_data = Enum.flat_map(decile_incomes, fn row ->
+  [
+    %{"Dezil" => row["Dezil"], "CHF/Monat" => row["Einkommen_Status_quo"], "Szenario" => "Status quo"},
+    %{"Dezil" => row["Dezil"], "CHF/Monat" => row["Einkommen_mit_UBI"], "Szenario" => "Mit Grundeinkommen"}
+  ]
+end)
 
 chart_comparison =
-  Vl.new(width: 720, height: 400, title: "Einkommen: Status quo vs. mit Grundeinkommen (CHF 2'500/Mt)")
-  |> Vl.data_from_values(
-    df_sim
-    |> DF.to_rows()
-    |> Enum.flat_map(fn row ->
-      [
-        %{"Dezil" => row["Dezil"], "Betrag" => row["value"], "Szenario" => "Status quo"},
-        %{"Dezil" => row["Dezil"], "Betrag" => row["income_with_ubi"], "Szenario" => "Mit Grundeinkommen"}
-      ]
-    end)
-  )
+  Vl.new(width: 720, height: 400, title: "Geschätztes Monatseinkommen: Status quo vs. Grundeinkommen (CHF 2'500/Mt)")
+  |> Vl.data_from_values(comparison_data)
   |> Vl.mark(:bar, corner_radius_end: 4)
   |> Vl.encode_field(:x, "Dezil", type: :ordinal, title: "Einkommensdezil")
-  |> Vl.encode_field(:y, "Betrag", type: :quantitative, title: "CHF/Jahr")
+  |> Vl.encode_field(:y, "CHF/Monat", type: :quantitative, title: "CHF/Monat")
   |> Vl.encode_field(:color, "Szenario",
     type: :nominal,
     scale: [range: ["#3b82f6", "#a855f7"]]
@@ -113,7 +170,7 @@ chart_comparison =
 ## Gini-Koeffizient
 
 ```elixir
-# Calculate approximate Gini coefficient from decile data
+# Calculate Gini from the simulated income distribution
 # Using the trapezoidal method on the Lorenz curve
 
 defmodule GiniCalc do
@@ -128,7 +185,6 @@ defmodule GiniCalc do
       cumulative = sorted |> Enum.scan(&(&1 + &2))
       lorenz = Enum.map(cumulative, &(&1 / total))
 
-      # Area under Lorenz curve (trapezoidal)
       area =
         lorenz
         |> Enum.with_index(1)
@@ -139,37 +195,68 @@ defmodule GiniCalc do
           acc + (x_curr - x_prev) * (y + y_prev) / 2
         end)
 
-      # Gini = 1 - 2 * area under Lorenz curve
       Float.round(1.0 - 2.0 * area, 4)
     end
   end
 end
 
-incomes_status_quo = df_income |> DF.pull("value") |> Series.to_list()
-incomes_with_ubi = df_sim |> DF.pull("income_with_ubi") |> Series.to_list()
+incomes_sq = Enum.map(decile_incomes, & &1["Einkommen_Status_quo"])
+incomes_ubi = Enum.map(decile_incomes, & &1["Einkommen_mit_UBI"])
 
-gini_sq = GiniCalc.gini(incomes_status_quo)
-gini_ubi = GiniCalc.gini(incomes_with_ubi)
+gini_sim_sq = GiniCalc.gini(incomes_sq)
+gini_sim_ubi = GiniCalc.gini(incomes_ubi)
 
-IO.puts("Gini (Status quo):          #{gini_sq}")
-IO.puts("Gini (mit Grundeinkommen):  #{gini_ubi}")
-IO.puts("Reduktion:                  #{Float.round(gini_sq - gini_ubi, 4)}")
+IO.puts("Gini BFS (2018):              #{gini_sq}")
+IO.puts("Gini simuliert (Status quo):   #{gini_sim_sq}")
+IO.puts("Gini simuliert (mit UBI):      #{gini_sim_ubi}")
+IO.puts("Reduktion:                     #{Float.round(gini_sim_sq - gini_sim_ubi, 4)}")
+```
+
+## Gini-Zeitreihe
+
+```elixir
+# Gini over time from all years in the dataset
+gini_timeseries =
+  df_all
+  |> DF.filter(col("Kennzahl") == "Gini_Koeffizient")
+  |> DF.to_rows()
+  |> Enum.map(fn row -> %{"Jahr" => row["Jahr"], "Gini" => row["Wert"]} end)
+  |> Enum.sort_by(& &1["Jahr"])
+
+chart_gini =
+  Vl.new(width: 720, height: 300, title: "Gini-Koeffizient des verfügbaren Äquivalenzeinkommens (1998–2018)")
+  |> Vl.data_from_values(gini_timeseries)
+  |> Vl.mark(:line, point: true, stroke_width: 2)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "Gini",
+    type: :quantitative,
+    title: "Gini-Koeffizient",
+    scale: [domain: [0.25, 0.35]]
+  )
+  |> Vl.encode(:color, value: "#a855f7")
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
+  )
 ```
 
 ## Kernaussage
 
 ```elixir
+d1_income = hd(decile_incomes)["Einkommen_Status_quo"]
+d1_pct_increase = round(ubi_monthly / max(d1_income, 1) * 100)
+
 Kino.Markdown.new("""
 ### Kernaussage
 
 Ein bedingungsloses Grundeinkommen von **CHF 2'500 pro Monat** würde
 die unteren Einkommensdezile überproportional stärken — die relative
-Einkommensverbesserung beträgt für das 1. Dezil rund **#{round(ubi_annual / max(Enum.at(incomes_status_quo, 0, 1), 1) * 100)}%**,
+Einkommensverbesserung beträgt für das 1. Dezil rund **#{d1_pct_increase}%**,
 während sie für das 10. Dezil unter 10% liegt.
 
-Der Gini-Koeffizient sinkt von **#{gini_sq}** auf **#{gini_ubi}** —
-ein deutlicher Rückgang der Einkommensungleichheit, allein durch den
-Sockelbetrag und ohne Berücksichtigung der Gegenfinanzierung.
+Der simulierte Gini-Koeffizient sinkt von **#{gini_sim_sq}** auf **#{gini_sim_ubi}** —
+ein Rückgang der Einkommensungleichheit allein durch den Sockelbetrag
+(ohne Berücksichtigung der Gegenfinanzierung).
 
 **Einschränkungen**: Diese Simulation basiert auf aggregierten Dezildaten
 (nicht auf individuellen Haushaltsdaten) und berücksichtigt weder die
@@ -181,52 +268,54 @@ Finanzierung noch Verhaltensanpassungen.
 
 ```elixir
 # Export charts and generate notiz draft
-# Run this cell to produce output files
-
 Zukunftslabor.ChartExport.to_svg(chart_deciles, name: "einkommensverteilung_dezile")
 Zukunftslabor.ChartExport.to_svg(chart_comparison, name: "einkommensverteilung_vergleich")
+Zukunftslabor.ChartExport.to_svg(chart_gini, name: "einkommensverteilung_gini_zeitreihe")
 
 Zukunftslabor.NotizTemplate.generate(
   title: "Was ein Grundeinkommen an der Einkommensverteilung ändern würde",
-  description: "Mikrosimulation: Ein bedingungsloses Grundeinkommen von CHF 2'500/Monat stärkt vor allem die unteren Einkommen und senkt den Gini-Koeffizienten deutlich.",
+  description: "Mikrosimulation: Ein bedingungsloses Grundeinkommen von CHF 2'500/Monat stärkt vor allem die unteren Einkommen und senkt den Gini-Koeffizienten.",
   slug: "einkommensverteilung-grundeinkommen",
   category: "datenbriefing",
   evidence: "mittel",
   tags: ["grundeinkommen", "einkommen", "ungleichheit", "simulation"],
-  charts: ["einkommensverteilung_dezile.svg", "einkommensverteilung_vergleich.svg"],
+  charts: ["einkommensverteilung_dezile.svg", "einkommensverteilung_vergleich.svg", "einkommensverteilung_gini_zeitreihe.svg"],
   summary: """
   Ein bedingungsloses Grundeinkommen von CHF 2'500 pro Monat würde die Schweizer
   Einkommensverteilung spürbar verändern: Die unteren Dezile profitieren relativ am
-  stärksten, der Gini-Koeffizient sinkt von #{gini_sq} auf #{gini_ubi}. Diese
-  Simulation basiert auf BFS-SILC-Daten und zeigt den Effekt vor Gegenfinanzierung.
+  stärksten, der simulierte Gini-Koeffizient sinkt von #{gini_sim_sq} auf #{gini_sim_ubi}.
+  Grundlage: BFS-HABE-Daten 2018 (Einkommensanteile nach Dezilen).
   """,
   body: """
   ## Methodik
 
-  Grundlage sind die verfügbaren Äquivalenzeinkommen nach Dezilen aus der
-  Erhebung über die Einkommen und Lebensbedingungen (SILC) 2022 des BFS.
+  Grundlage sind die Einkommensanteile nach Dezilen aus der
+  Haushaltsbudgeterhebung (HABE) 2018 des BFS. Daraus werden absolute
+  Monatseinkommen pro Dezil geschätzt (Anteil × Mittelwert × 10).
 
-  Die Mikrosimulation addiert CHF 30'000 (12 × CHF 2'500) auf jedes Dezil
-  und berechnet den resultierenden Gini-Koeffizienten. Da nur Dezilmediane
-  vorliegen (keine Individualdaten), ist die Gini-Schätzung approximativ.
+  Die Mikrosimulation addiert CHF 2'500/Monat auf jedes Dezil und berechnet
+  den resultierenden Gini-Koeffizienten. Da nur Dezilanteile vorliegen
+  (keine Individualdaten), ist die Gini-Schätzung approximativ.
 
   ## Ergebnisse
 
-  ![Einkommensverteilung nach Dezil](/zukunftslabor/charts/einkommensverteilung_dezile.svg)
+  ![Einkommensanteile nach Dezil](/zukunftslabor/charts/einkommensverteilung_dezile.svg)
 
   ![Vergleich: Status quo vs. Grundeinkommen](/zukunftslabor/charts/einkommensverteilung_vergleich.svg)
 
+  ![Gini-Zeitreihe 1998–2018](/zukunftslabor/charts/einkommensverteilung_gini_zeitreihe.svg)
+
   ## Einschränkungen
 
-  - Aggregierte Dezildaten statt Mikrodaten (SILC-Individualdaten erfordern BFS-Antrag)
+  - Aggregierte Dezildaten statt Mikrodaten (Individualdaten erfordern BFS-Antrag)
   - Keine Modellierung der Gegenfinanzierung (Steuererhöhungen, Transferablösung)
   - Keine Verhaltensanpassungen (Arbeitsangebot, Konsummuster)
-  - Dezilmediane unterschätzen die Streuung innerhalb der Gruppen
+  - Dezilanteile unterschätzen die Streuung innerhalb der Gruppen
+  - Daten nur bis 2018 verfügbar (neueste BFS-HABE-Publikation)
 
   ## Datenquellen
 
-  - BFS SILC 2022: Verfügbares Äquivalenzeinkommen nach Dezilen
-  - BFS Soziale Sicherheit: Bestehende Sozialleistungen nach Funktion
+  - BFS HABE 2018: Kennzahlen zur Verteilung der Einkommen (Verfügbares Äquivalenzeinkommen)
   """
 )
 ```

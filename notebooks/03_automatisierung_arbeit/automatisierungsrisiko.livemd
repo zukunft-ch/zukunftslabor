@@ -28,9 +28,9 @@ Mix.install([
 alias Explorer.DataFrame, as: DF
 alias Explorer.Series
 
-# Employment by sector (SAKE)
-df_employment = DF.from_csv!(Path.join(System.get_env("PWD", "."), "data/processed/erwerbstaetige_sake.csv"))
-DF.head(df_employment)
+# BFS SAKE: employment by economic sector
+# Columns: Sektor (string), Bezeichnung (string), Erwerbstaetige (s64), Jahr (s64)
+df_employment = Zukunftslabor.DataLoader.load("erwerbstaetige_sake")
 ```
 
 ## Beschäftigung nach Wirtschaftsabschnitt
@@ -38,17 +38,28 @@ DF.head(df_employment)
 ```elixir
 alias VegaLite, as: Vl
 
-# Latest year employment by sector
-df_latest = df_employment
-  |> DF.filter(col("Jahr") == "2023")
-  |> DF.sort_by(desc: col("value"))
+# Latest year employment by sector (excluding Total)
+df_latest =
+  df_employment
+  |> DF.filter(col("Jahr") == 2024 and col("Sektor") != "Total")
+  |> DF.sort_by(desc: col("Erwerbstaetige"))
+
+employment_data =
+  df_latest
+  |> DF.to_rows()
+  |> Enum.map(fn row ->
+    %{
+      "Bezeichnung" => row["Bezeichnung"],
+      "Erwerbstätige" => round(row["Erwerbstaetige"] / 1000)
+    }
+  end)
 
 chart_employment =
-  Vl.new(width: 720, height: 500, title: "Erwerbstätige nach Wirtschaftsabschnitt (2023)")
-  |> Vl.data_from_values(df_latest |> DF.to_rows())
+  Vl.new(width: 720, height: 500, title: "Erwerbstätige nach Wirtschaftsabschnitt (2024, in Tsd.)")
+  |> Vl.data_from_values(employment_data)
   |> Vl.mark(:bar, corner_radius_end: 4)
-  |> Vl.encode_field(:y, "Wirtschaftsabschnitt", type: :nominal, title: nil, sort: "-x")
-  |> Vl.encode_field(:x, "value", type: :quantitative, title: "Erwerbstätige (in 1'000)")
+  |> Vl.encode_field(:y, "Bezeichnung", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Erwerbstätige", type: :quantitative, title: "Erwerbstätige (in 1'000)")
   |> Vl.encode(:color, value: "#3b82f6")
   |> Vl.config(
     font: "Switzer, system-ui, sans-serif",
@@ -62,25 +73,37 @@ chart_employment =
 # OECD automation risk estimates (Nedelkoska & Quintini 2018, updated)
 # Risk categories: high (>70%), medium (50-70%), low (<50%)
 # Applied to Swiss NOGA sectors
+#
+# Sector mapping uses actual BFS SAKE Bezeichnung values.
+# Beschaeftigte: actual 2024 figures from SAKE (in thousands).
+
+# Build a lookup of actual employment figures (in thousands)
+employment_lookup =
+  df_latest
+  |> DF.to_rows()
+  |> Map.new(fn row -> {row["Bezeichnung"], round(row["Erwerbstaetige"] / 1000)} end)
 
 # Approximate automation risk by sector (OECD methodology)
 risk_data = [
-  %{"Sektor" => "Verarbeitendes Gewerbe", "Risiko_hoch" => 35, "Risiko_mittel" => 30, "Beschaeftigte" => 580},
-  %{"Sektor" => "Handel, Reparatur", "Risiko_hoch" => 28, "Risiko_mittel" => 35, "Beschaeftigte" => 620},
-  %{"Sektor" => "Gastgewerbe", "Risiko_hoch" => 42, "Risiko_mittel" => 28, "Beschaeftigte" => 250},
-  %{"Sektor" => "Verkehr, Lagerei", "Risiko_hoch" => 38, "Risiko_mittel" => 25, "Beschaeftigte" => 230},
-  %{"Sektor" => "Finanzdienstleistungen", "Risiko_hoch" => 22, "Risiko_mittel" => 38, "Beschaeftigte" => 220},
-  %{"Sektor" => "Gesundheitswesen", "Risiko_hoch" => 12, "Risiko_mittel" => 25, "Beschaeftigte" => 380},
-  %{"Sektor" => "Information, Kommunikation", "Risiko_hoch" => 8, "Risiko_mittel" => 22, "Beschaeftigte" => 180},
-  %{"Sektor" => "Baugewerbe", "Risiko_hoch" => 25, "Risiko_mittel" => 32, "Beschaeftigte" => 340},
-  %{"Sektor" => "Erziehung, Unterricht", "Risiko_hoch" => 5, "Risiko_mittel" => 15, "Beschaeftigte" => 320},
-  %{"Sektor" => "Öffentliche Verwaltung", "Risiko_hoch" => 15, "Risiko_mittel" => 30, "Beschaeftigte" => 180}
+  %{"Sektor" => "Verarbeitendes Gewerbe, Bergbau", "Risiko_hoch" => 35, "Risiko_mittel" => 30},
+  %{"Sektor" => "Handel, Reparatur", "Risiko_hoch" => 28, "Risiko_mittel" => 35},
+  %{"Sektor" => "Gastgewerbe, Beherbergung", "Risiko_hoch" => 42, "Risiko_mittel" => 28},
+  %{"Sektor" => "Verkehr, Lagerei", "Risiko_hoch" => 38, "Risiko_mittel" => 25},
+  %{"Sektor" => "Finanz-, Versicherungsdienstl.", "Risiko_hoch" => 22, "Risiko_mittel" => 38},
+  %{"Sektor" => "Gesundheits-, Sozialwesen", "Risiko_hoch" => 12, "Risiko_mittel" => 25},
+  %{"Sektor" => "Information, Kommunikation", "Risiko_hoch" => 8, "Risiko_mittel" => 22},
+  %{"Sektor" => "Baugewerbe", "Risiko_hoch" => 25, "Risiko_mittel" => 32},
+  %{"Sektor" => "Erziehung und Unterricht", "Risiko_hoch" => 5, "Risiko_mittel" => 15},
+  %{"Sektor" => "Öffentliche Verwaltung", "Risiko_hoch" => 15, "Risiko_mittel" => 30}
 ]
 
-# Compute exposed workers
+# Enrich with actual employment data from SAKE 2024
 risk_enriched = Enum.map(risk_data, fn row ->
-  exposed = round(row["Beschaeftigte"] * row["Risiko_hoch"] / 100)
-  Map.put(row, "Exponierte_Stellen", exposed)
+  beschaeftigte = Map.get(employment_lookup, row["Sektor"], 0)
+  exposed = round(beschaeftigte * row["Risiko_hoch"] / 100)
+  row
+  |> Map.put("Beschaeftigte", beschaeftigte)
+  |> Map.put("Exponierte_Stellen", exposed)
 end)
 
 chart_risk =
@@ -139,7 +162,7 @@ chart_exposed =
 Kino.Markdown.new("""
 ### Kernaussage
 
-Rund **#{total_exposed}'000 Arbeitsplätze** (#{round(total_exposed / total_workers * 100)}% der
+Rund **#{total_exposed}'000 Arbeitsplätze** (#{round(total_exposed / max(total_workers, 1) * 100)}% der
 betrachteten Sektoren) tragen ein hohes Automatisierungsrisiko. Am stärksten
 betroffen: Verarbeitendes Gewerbe, Handel und Gastgewerbe.
 
@@ -173,7 +196,7 @@ Zukunftslabor.NotizTemplate.generate(
   body: """
   ## Methodik
 
-  Die Analyse kombiniert BFS-SAKE-Beschäftigungsdaten (2023) mit OECD-
+  Die Analyse kombiniert BFS-SAKE-Beschäftigungsdaten (2024) mit OECD-
   Automatisierungsrisikoschätzungen (Nedelkoska & Quintini 2018, aktualisiert).
   Die OECD-Methodik schätzt das Risiko auf Berufsebene (ISCO) und wird hier
   auf Branchenebene (NOGA) aggregiert.
@@ -200,7 +223,7 @@ Zukunftslabor.NotizTemplate.generate(
 
   ## Datenquellen
 
-  - BFS SAKE 2023: Erwerbstätige nach Wirtschaftsabschnitt
+  - BFS SAKE 2024: Erwerbstätige nach Wirtschaftsabschnitt
   - OECD (2018): Automation and Independent Work in a Digital Economy
   - Nedelkoska & Quintini (2018): Automation, skills use and training (OECD Social, Employment and Migration Working Papers No. 202)
   """
