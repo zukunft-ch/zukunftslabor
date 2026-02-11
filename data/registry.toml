@@ -1,95 +1,55 @@
 # Dataset registry — defines what to fetch and from where.
 # Run `mise run fetch` to download all datasets.
 # Run `mise run fetch <name>` to fetch a specific one.
+#
+# Source types:
+#   bfs-pxweb  — BFS STAT-TAB PxWeb API (POST with dimension query)
+#   bfs-dam    — BFS DAM API direct CSV/XLS download
+#   url        — arbitrary URL download
 
 # ─── Basic income modelling ──────────────────────────────────────────
 
 [datasets.einkommensverteilung_silc]
-description = "Einkommensverteilung nach Dezilen (SILC)"
-source = "bfs"
-path = "de/20/20.01"
-table = "px-x-2004020000_104"
-topic = "Einkommen, Verbrauch und Vermögen"
-[datasets.einkommensverteilung_silc.dimensions]
-# Year: latest available
-"Jahr" = ["2022"]
-# Income concept: equivalised disposable income
-"Einkommenskonzept" = "*"
-# Dezil: all deciles
-"Dezil" = "*"
-
-[datasets.soziale_sicherheit_transfers]
-description = "Sozialleistungen nach Funktion (AHV, IV, EL, etc.)"
-source = "bfs"
-path = "de/13/13.02"
-table = "px-x-1303010000_101"
-topic = "Soziale Sicherheit"
-[datasets.soziale_sicherheit_transfers.dimensions]
-"Jahr" = ["2020", "2021", "2022"]
-"Funktion" = "*"
-"Leistungsart" = "*"
-
-[datasets.steuerpflichtige_einkommen]
-description = "Steuerpflichtiges Einkommen nach Kanton und Einkommensklasse"
-source = "bfs"
-path = "de/18/18.02"
-table = "px-x-1802020000_102"
-topic = "Öffentliche Finanzen"
-[datasets.steuerpflichtige_einkommen.dimensions]
-"Jahr" = ["2020"]
-"Kanton" = "*"
-"Einkommensklasse" = "*"
+description = "Einkommensverteilung nach Dezilen — Gini, Median, Mittelwert, Einkommensanteile (HABE/SILC)"
+source = "bfs-dam"
+url = "https://www.bfs.admin.ch/bfsstatic/dam/assets/15344786/master"
+format = "xlsx"
+note = "Excel with one sheet per year (2018–1998). Verfügbares Äquivalenzeinkommen in col F."
+processed_as = "einkommensverteilung_silc.csv"
 
 # ─── Digital sovereignty & e-ID ──────────────────────────────────────
 
-[datasets.ikt_nutzung_haushalte]
-description = "IKT-Nutzung in Haushalten — E-Government, digitale Kompetenzen"
-source = "bfs"
-path = "de/16/16.04"
-table = "px-x-1604000000_101"
-topic = "Kultur, Medien, Informationsgesellschaft, Sport"
-[datasets.ikt_nutzung_haushalte.dimensions]
-"Jahr" = ["2021", "2023"]
-"Indikator" = "*"
+[datasets.ikt_egov]
+description = "E-Government-Nutzung: Behördenkontakte, Formulare, Informationssuche"
+source = "bfs-pxweb"
+table = "px-x-1604000000_103"
+note = "Has 2014–2025 data. Percentage of population using e-government services."
+processed_as = "ikt_egov.csv"
+[datasets.ikt_egov.dimensions]
+"Online-Dienste in Zusammenhang mit den Behörden" = ["IGV12", "IGOV12IFCH", "IGOV12FMCH", "IGOV12RTCH"]
+"Geschlecht" = ["0"]
+"Altersklasse" = ["0"]
+"Bildungsstand" = ["0"]
+"Jahr" = ["2025", "2023", "2021", "2019", "2017", "2014"]
+"Absolut / relativ" = ["1"]
+"Resultat" = ["0"]
 
 # ─── Automation & labour ─────────────────────────────────────────────
 
 [datasets.erwerbstaetige_sake]
-description = "Erwerbstätige nach Wirtschaftsabschnitt (SAKE)"
-source = "bfs"
-path = "de/03/03.02"
-table = "px-x-0302010000_101"
-topic = "Arbeit und Erwerb"
-[datasets.erwerbstaetige_sake.dimensions]
-"Jahr" = ["2018", "2019", "2020", "2021", "2022", "2023"]
-"Wirtschaftsabschnitt" = "*"
-"Geschlecht" = ["0"]
-
-[datasets.oecd_automation_risk]
-description = "OECD automation risk estimates by occupation"
-source = "url"
-url = "https://stats.oecd.org/sdmx-json/data/AUTOMATION_RISK/CHE.../all?detail=Full&dimensionAtObservation=AllDimensions"
+description = "Erwerbstätige (Inlandkonzept) nach Wirtschaftsabschnitt — SAKE Jahres- und Quartalswerte"
+source = "bfs-dam"
+url = "https://dam-api.bfs.admin.ch/hub/api/dam/assets/36278176/master"
+format = "csv"
+note = "Raw CSV with NOGA sector codes (A, B-C, ..., T). Annual data up to 2024, quarterly up to 2025-Q3."
+processed_as = "erwerbstaetige_sake.csv"
 
 # ─── Housing & inequality ────────────────────────────────────────────
 
-[datasets.mietbelastung_silc]
-description = "Mietbelastung nach Einkommensquintil (SILC)"
-source = "bfs"
-path = "de/20/20.01"
-table = "px-x-2004020000_105"
-topic = "Einkommen, Verbrauch und Vermögen"
-[datasets.mietbelastung_silc.dimensions]
-"Jahr" = ["2022"]
-"Indikator" = "*"
-"Quintil" = "*"
-
 [datasets.mietzinse_kantone]
-description = "Durchschnittliche Mietzinse nach Kanton"
-source = "bfs"
-path = "de/09/09.03"
-table = "px-x-0903010000_101"
-topic = "Bau- und Wohnungswesen"
-[datasets.mietzinse_kantone.dimensions]
-"Jahr" = ["2020", "2021", "2022"]
-"Kanton" = "*"
-"Zimmerzahl" = "*"
+description = "Durchschnittlicher Mietpreis in CHF nach Zimmerzahl und Kanton (Strukturerhebung)"
+source = "bfs-dam"
+url = "https://dam-api.bfs.admin.ch/hub/api/dam/assets/33947475/master"
+format = "xlsx"
+note = "Excel with one sheet per year (2023–2010). 26 cantons + CH total × 7 room categories."
+processed_as = "mietzinse_kantone.csv"
