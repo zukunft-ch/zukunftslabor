@@ -219,6 +219,11 @@ Zukunftslabor.ChartExport.to_svg(chart_verwaltungsanteil, name: "gesundheit_verw
 Zukunftslabor.ChartExport.to_svg(chart_international, name: "gesundheit_verwaltung_international")
 Zukunftslabor.ChartExport.to_svg(chart_ueberschuss, name: "gesundheit_verwaltungsueberschuss")
 
+Zukunftslabor.ChartExport.to_json(chart_kategorien, name: "gesundheit_ausgaben_kategorien")
+Zukunftslabor.ChartExport.to_json(chart_verwaltungsanteil, name: "gesundheit_verwaltungsanteil_trend")
+Zukunftslabor.ChartExport.to_json(chart_international, name: "gesundheit_verwaltung_international")
+Zukunftslabor.ChartExport.to_json(chart_ueberschuss, name: "gesundheit_verwaltungsueberschuss")
+
 Zukunftslabor.NotizTemplate.generate(
   title: "Gesundheitskosten: Wo fliesst das Geld — und wo versickert es?",
   description:
@@ -233,6 +238,7 @@ Zukunftslabor.NotizTemplate.generate(
     "gesundheit_verwaltung_international.svg",
     "gesundheit_verwaltungsueberschuss.svg"
   ],
+  draft: true,
   summary: """
   Die Schweiz gibt #{latest_admin["Total Mio."]} Mio. CHF für Gesundheit aus
   (#{latest_year}), davon #{latest_admin["Verwaltungsanteil %"]}% für Verwaltung.
@@ -247,23 +253,39 @@ Zukunftslabor.NotizTemplate.generate(
   Langzeitpflege, Gesundheitsgüter, Verwaltung, Prävention. Internationaler Vergleich
   auf Basis OECD Health at a Glance 2023.
 
-  ## Ergebnisse
+  ---
 
   ### Ausgaben nach Kategorie im Zeitverlauf
 
-  ![Kategorien](/zukunftslabor/charts/gesundheit_ausgaben_kategorien.svg)
+  {% chart(spec="gesundheit_ausgaben_kategorien", alt="Gesundheitsausgaben nach Kategorie im Zeitverlauf") %}
+  Die Gesundheitsausgaben steigen kontinuierlich — aber nicht gleichmässig. Während ambulante und stationäre Versorgung den Löwenanteil ausmachen, wächst der Verwaltungsanteil überproportional. Das wirft die Frage auf, wie viel vom Prämienanstieg in Behandlung fliesst und wie viel in Bürokratie.
+  {% end %}
+
+  ---
 
   ### Verwaltungsanteil im Zeitverlauf
 
-  ![Verwaltungsanteil](/zukunftslabor/charts/gesundheit_verwaltungsanteil_trend.svg)
+  {% chart(spec="gesundheit_verwaltungsanteil_trend", alt="Verwaltungsanteil an den Gesundheitsausgaben im Zeitverlauf") %}
+  Der Verwaltungsanteil steigt langsam, aber stetig. Das ist kein Zufall: Die fragmentierte Versicherungslandschaft mit über 50 Krankenkassen erzeugt strukturelle Mehrkosten — Rechnungswesen, Marketing, Risikoselektion — die in einem Einheitssystem nicht anfallen würden.
+  {% end %}
+
+  ---
 
   ### Internationaler Vergleich
 
-  ![Internationaler Vergleich](/zukunftslabor/charts/gesundheit_verwaltung_international.svg)
+  {% chart(spec="gesundheit_verwaltung_international", alt="Verwaltungsanteil im internationalen Vergleich") %}
+  Die Schweiz liegt bei den Verwaltungskosten deutlich über dem OECD-Durchschnitt. Länder mit zentralisierteren Systemen (z.B. skandinavische Staaten) erzielen tiefere Admin-Anteile bei vergleichbarer oder besserer Versorgungsqualität. Der Vergleich zeigt: Effizienzgewinne sind möglich.
+  {% end %}
+
+  ---
 
   ### Verwaltungsüberschuss
 
-  ![Überschuss](/zukunftslabor/charts/gesundheit_verwaltungsueberschuss.svg)
+  {% chart(spec="gesundheit_verwaltungsueberschuss", alt="Verwaltungsüberschuss gegenüber OECD-Schnitt in CHF pro Person") %}
+  Der Überschuss gegenüber dem OECD-Schnitt lässt sich in Franken pro Person und Monat ausdrücken. Dieses Geld geht nicht in Behandlungen, Medikamente oder Pflege — es finanziert administrative Strukturen, deren Vereinfachung direkt Prämien senken würde.
+  {% end %}
+
+  ---
 
   ## Einschränkungen
 
@@ -271,6 +293,8 @@ Zukunftslabor.NotizTemplate.generate(
   - Verwaltungskosten enthalten auch Qualitätssicherung und Regulierungsaufwand
   - Einheitskasse vs. Wettbewerbsmodell erzeugt strukturell verschiedene Admin-Kosten
   - OECD-Daten teilweise zeitlich versetzt (2021–2023)
+
+  ---
 
   ## Datenquellen
 

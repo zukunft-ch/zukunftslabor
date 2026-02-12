@@ -321,6 +321,12 @@ Zukunftslabor.ChartExport.to_svg(chart_gap, name: "digital_luecke_alter")
 Zukunftslabor.ChartExport.to_svg(chart_eid, name: "digital_eid_motive")
 Zukunftslabor.ChartExport.to_svg(chart_opendata, name: "digital_opendata_vergleich")
 
+Zukunftslabor.ChartExport.to_json(chart_internet, name: "digital_internetnutzung_alter")
+Zukunftslabor.ChartExport.to_json(chart_egov, name: "digital_egov_trend")
+Zukunftslabor.ChartExport.to_json(chart_gap, name: "digital_luecke_alter")
+Zukunftslabor.ChartExport.to_json(chart_eid, name: "digital_eid_motive")
+Zukunftslabor.ChartExport.to_json(chart_opendata, name: "digital_opendata_vergleich")
+
 Zukunftslabor.NotizTemplate.generate(
   title: "Digitale Bereitschaftslücke: Die Bevölkerung ist online — der Staat nicht",
   description:
@@ -336,6 +342,7 @@ Zukunftslabor.NotizTemplate.generate(
     "digital_eid_motive.svg",
     "digital_opendata_vergleich.svg"
   ],
+  draft: true,
   summary: """
   90% der Schweizer Bevölkerung nutzen das Internet regelmässig — aber
   E-Government-Nutzung, Online-Verfügbarkeit und Open-Data-Reife liegen
@@ -354,27 +361,47 @@ Zukunftslabor.NotizTemplate.generate(
   Gesamtbevölkerung. Ergänzt durch das EU Open Data Maturity Ranking und
   VOX/Sotomo-Daten zum E-ID-Referendum 2021.
 
-  ## Ergebnisse
+  ---
 
   ### Internetnutzung nach Altersgruppe
 
-  ![Internetnutzung nach Alter](/zukunftslabor/charts/digital_internetnutzung_alter.svg)
+  {% chart(spec="digital_internetnutzung_alter", alt="Internetnutzung nach Altersgruppe in der Schweiz") %}
+  Nahezu alle Altersgruppen unter 65 liegen über 90% Internetnutzung. Selbst die 65–74-Jährigen sind inzwischen mehrheitlich online. Das Problem ist nicht die digitale Kompetenz der Bevölkerung — es ist die fehlende digitale Infrastruktur auf Staatsseite.
+  {% end %}
+
+  ---
 
   ### E-Government-Nutzung
 
-  ![E-Gov-Trend](/zukunftslabor/charts/digital_egov_trend.svg)
+  {% chart(spec="digital_egov_trend", alt="E-Government-Nutzung im Zeitverlauf") %}
+  Die E-Government-Nutzung stagniert seit Jahren. Trotz zunehmender Internetdurchdringung ist der Anteil der Bevölkerung, der staatliche Online-Dienste nutzt, kaum gewachsen. Das deutet auf ein Angebotsproblem hin: Nicht die Nachfrage fehlt, sondern brauchbare digitale Services.
+  {% end %}
+
+  ---
 
   ### Bereitschaftslücke
 
-  ![Digitale Lücke](/zukunftslabor/charts/digital_luecke_alter.svg)
+  {% chart(spec="digital_luecke_alter", alt="Digitale Bereitschaftslücke zwischen Bevölkerung und Staat") %}
+  Die Lücke zwischen allgemeiner Internetnutzung und E-Gov-Nutzung beträgt rund 12 Prozentpunkte. Diese Bereitschaftslücke ist kein technologisches, sondern ein institutionelles Problem: Die Bevölkerung ist bereit — der Staat nicht.
+  {% end %}
+
+  ---
 
   ### E-ID-Referendum: Vertrauensfrage
 
-  ![E-ID Motive](/zukunftslabor/charts/digital_eid_motive.svg)
+  {% chart(spec="digital_eid_motive", alt="Ablehnungsmotive beim E-ID-Referendum 2021") %}
+  Das Nein zur E-ID 2021 war keine Ablehnung digitaler Identitäten, sondern des privatwirtschaftlichen Modells. Datenschutzbedenken und fehlendes Vertrauen in private Anbieter waren die Hauptmotive. Eine staatliche, datenschutzfreundliche Lösung hat weiterhin breite Unterstützung.
+  {% end %}
+
+  ---
 
   ### Open-Data-Reife
 
-  ![Open Data Vergleich](/zukunftslabor/charts/digital_opendata_vergleich.svg)
+  {% chart(spec="digital_opendata_vergleich", alt="Open-Data-Reife: Schweiz vs. EU-Durchschnitt") %}
+  Im EU Open Data Maturity Ranking liegt die Schweiz unter dem Durchschnitt — sowohl bei der Verfügbarkeit als auch bei der Nutzbarkeit offener Verwaltungsdaten. Das erschwert Innovation, Transparenz und datenbasierte Politikgestaltung.
+  {% end %}
+
+  ---
 
   ## Einschränkungen
 
@@ -382,6 +409,8 @@ Zukunftslabor.NotizTemplate.generate(
   - E-Gov-Daten nicht nach Altersgruppe verfügbar — Lücke nur auf Totalebene berechenbar
   - Open-Data-Score basiert auf EU-Methodik (Schweiz als Beobachterstaat)
   - E-ID-Motive: VOX-Nachbefragung mit begrenzter Stichprobe
+
+  ---
 
   ## Datenquellen
 

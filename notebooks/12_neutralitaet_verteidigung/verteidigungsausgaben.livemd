@@ -229,6 +229,11 @@ Zukunftslabor.ChartExport.to_svg(chart_vergleich, name: "verteidigung_vergleich"
 Zukunftslabor.ChartExport.to_svg(chart_pro_soldat, name: "verteidigung_pro_soldat")
 Zukunftslabor.ChartExport.to_svg(chart_prioritaeten, name: "verteidigung_prioritaeten_luecke")
 
+Zukunftslabor.ChartExport.to_json(chart_ch_trend, name: "verteidigung_ch_trend")
+Zukunftslabor.ChartExport.to_json(chart_vergleich, name: "verteidigung_vergleich")
+Zukunftslabor.ChartExport.to_json(chart_pro_soldat, name: "verteidigung_pro_soldat")
+Zukunftslabor.ChartExport.to_json(chart_prioritaeten, name: "verteidigung_prioritaeten_luecke")
+
 Zukunftslabor.NotizTemplate.generate(
   title: "Verteidigung: Was kauft der Schweizer Verteidigungsfranken?",
   description:
@@ -243,6 +248,7 @@ Zukunftslabor.NotizTemplate.generate(
     "verteidigung_pro_soldat.svg",
     "verteidigung_prioritaeten_luecke.svg"
   ],
+  draft: true,
   summary: """
   Die Schweiz gibt #{ch_bip}% des BIP für Verteidigung aus (#{latest_year}). Die
   Miliz-Truppenstärke (140'000) bindet 58% des Budgets für Personal. Cyber und
@@ -256,23 +262,39 @@ Zukunftslabor.NotizTemplate.generate(
   Budgetallokation: VBS Armeebotschaft 2024, vereinfachte Kategorien.
   Bevölkerungsprioritäten: ETH CSS Sicherheitsstudie 2024.
 
-  ## Ergebnisse
+  ---
 
   ### Schweizer Ausgabentrend
 
-  ![CH Trend](/zukunftslabor/charts/verteidigung_ch_trend.svg)
+  {% chart(spec="verteidigung_ch_trend", alt="Schweizer Verteidigungsausgaben als BIP-Anteil im Zeitverlauf") %}
+  Die Schweizer Verteidigungsausgaben sind seit den 1990er-Jahren kontinuierlich gesunken und liegen heute deutlich unter 1% des BIP. Der aktuelle politische Druck zur Aufstockung steht im Kontrast zu einem Jahrzehnte langen Spartrend — die Frage ist nicht nur «wie viel mehr», sondern «wofür».
+  {% end %}
+
+  ---
 
   ### Internationaler Vergleich
 
-  ![Vergleich](/zukunftslabor/charts/verteidigung_vergleich.svg)
+  {% chart(spec="verteidigung_vergleich", alt="Verteidigungsausgaben als BIP-Anteil im internationalen Vergleich") %}
+  Im internationalen Vergleich liegt die Schweiz am unteren Ende — unter dem NATO-Ziel von 2% und unter den meisten europäischen Nachbarn. Dabei ist zu beachten: Die Schweiz hat keine Bündnisverpflichtungen, was den direkten Vergleich relativiert, aber die Fähigkeitslücken nicht kleiner macht.
+  {% end %}
+
+  ---
 
   ### Kosten pro aktivem Soldaten
 
-  ![Pro Soldat](/zukunftslabor/charts/verteidigung_pro_soldat.svg)
+  {% chart(spec="verteidigung_pro_soldat", alt="Kosten pro aktivem Soldaten im Ländervergleich") %}
+  Das Milizmodell führt zu einer besonderen Kostenstruktur: Die Schweiz hat 140'000 Angehörige der Armee, aber der Grossteil dient im Milizdienst. Die Kosten pro Soldat liegen im Vergleich zu Berufsarmeen tiefer — dafür binden Personalkosten 58% des Gesamtbudgets und lassen wenig Raum für Modernisierung.
+  {% end %}
+
+  ---
 
   ### Budget vs. Bevölkerungsprioritäten
 
-  ![Prioritäten](/zukunftslabor/charts/verteidigung_prioritaeten_luecke.svg)
+  {% chart(spec="verteidigung_prioritaeten_luecke", alt="Budgetallokation vs. Prioritäten der Bevölkerung") %}
+  Die Diskrepanz zwischen Budgetallokation und Bevölkerungsprioritäten ist frappant: Cyber-Sicherheit und Katastrophenhilfe werden von 82–88% der Bevölkerung als prioritär eingestuft, erhalten aber je nur 3–4% des Budgets. Klassische Landesverteidigung bindet das meiste Geld — obwohl die Bedrohungswahrnehmung sich verschoben hat.
+  {% end %}
+
+  ---
 
   ## Einschränkungen
 
@@ -280,6 +302,8 @@ Zukunftslabor.NotizTemplate.generate(
   - VBS-Budgetkategorien vereinfacht dargestellt
   - Bevölkerungsprioritäten: Befragung (nicht gewichtet nach Sicherheitsexpertise)
   - SIPRI-Daten: Definitionsunterschiede bei Verteidigungsausgaben zwischen Ländern
+
+  ---
 
   ## Datenquellen
 

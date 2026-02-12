@@ -53,6 +53,29 @@ defmodule Zukunftslabor.ChartExport do
   end
 
   @doc """
+  Export a VegaLite spec to JSON file for client-side rendering.
+
+  Options:
+    - `:name` - output filename without extension (required)
+
+  Returns the output path.
+  """
+  def to_json(%Vl{} = chart, opts) do
+    name = Keyword.fetch!(opts, :name)
+
+    spec = chart |> VegaLite.to_spec()
+    json = Jason.encode!(spec, pretty: true)
+
+    dir = Zukunftslabor.charts_dir()
+    File.mkdir_p!(dir)
+    path = Path.join(dir, "#{name}.json")
+    File.write!(path, json)
+
+    IO.puts("Chart spec exported → #{path}")
+    path
+  end
+
+  @doc """
   Apply standard zukunftslabor chart styling.
   Uses brand colors and Switzer font.
   """

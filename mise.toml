@@ -70,7 +70,12 @@ mkdir -p "$charts_dir" "$content_dir"
 
 if ls output/charts/*.svg 1>/dev/null 2>&1; then
   cp output/charts/*.svg "$charts_dir/"
-  echo "Copied charts → $charts_dir"
+  echo "Copied SVG charts → $charts_dir"
+fi
+
+if ls output/charts/*.json 1>/dev/null 2>&1; then
+  cp output/charts/*.json "$charts_dir/"
+  echo "Copied JSON specs → $charts_dir"
 fi
 
 if ls output/drafts/*.md 1>/dev/null 2>&1; then

@@ -154,7 +154,7 @@ scatter_data =
       "Sektor" => r.s,
       "Automatisierungsrisiko %" => r.risk,
       "Weiterbildungsquote %" => r.training,
-      "Erwerbstätige (Tsd.)" => count
+      "Erwerbstätige Tsd" => count
     }
   end)
 
@@ -178,8 +178,8 @@ chart_kreuz =
     title: "Post-LLM Automatisierungsrisiko (%)")
   |> Vl.encode_field(:y, "Weiterbildungsquote %", type: :quantitative,
     title: "Weiterbildungsquote (%)")
-  |> Vl.encode_field(:size, "Erwerbstätige (Tsd.)", type: :quantitative,
-    scale: [range: [100, 1500]], legend: [title: "Erwerbstätige (Tsd.)"])
+  |> Vl.encode_field(:size, "Erwerbstätige Tsd", type: :quantitative,
+    scale: [range: [100, 1500]], legend: [title: "Erwerbstätige Tsd"])
   |> Vl.encode_field(:color, "Automatisierungsrisiko %", type: :quantitative,
     scale: [scheme: "redyellowgreen", reverse: true], legend: nil)
   |> Vl.encode_field(:tooltip, "Sektor", type: :nominal)
@@ -228,6 +228,11 @@ Zukunftslabor.ChartExport.to_svg(chart_altersgruppe, name: "weiterbildung_alters
 Zukunftslabor.ChartExport.to_svg(chart_zeitreihe, name: "weiterbildung_zeitreihe")
 Zukunftslabor.ChartExport.to_svg(chart_kreuz, name: "weiterbildung_automatisierung_kreuz")
 
+Zukunftslabor.ChartExport.to_json(chart_bildungsniveau, name: "weiterbildung_bildungsniveau")
+Zukunftslabor.ChartExport.to_json(chart_altersgruppe, name: "weiterbildung_altersgruppe")
+Zukunftslabor.ChartExport.to_json(chart_zeitreihe, name: "weiterbildung_zeitreihe")
+Zukunftslabor.ChartExport.to_json(chart_kreuz, name: "weiterbildung_automatisierung_kreuz")
+
 Zukunftslabor.NotizTemplate.generate(
   title: "Weiterbildung: Wer bildet sich weiter — und wer nicht?",
   description:
@@ -242,6 +247,7 @@ Zukunftslabor.NotizTemplate.generate(
     "weiterbildung_zeitreihe.svg",
     "weiterbildung_automatisierung_kreuz.svg"
   ],
+  draft: true,
   summary: """
   Die Weiterbildungsteilnahme stagniert bei 60% — und die Schere zwischen
   Hoch- und Geringqualifizierten (79% vs. 30%) ist enorm. Branchen mit
@@ -255,23 +261,39 @@ Zukunftslabor.NotizTemplate.generate(
   Seminare, betriebliche Schulungen). Beschäftigungsdaten aus BFS SAKE
   (#{latest_emp_year}). Automatisierungsrisiko: IMF AI Preparedness Index 2024.
 
-  ## Ergebnisse
+  ---
 
   ### Nach Bildungsniveau
 
-  ![Bildungsniveau](/zukunftslabor/charts/weiterbildung_bildungsniveau.svg)
+  {% chart(spec="weiterbildung_bildungsniveau", alt="Weiterbildungsteilnahme nach Bildungsniveau") %}
+  Hochqualifizierte bilden sich 2.6-mal häufiger weiter als Geringqualifizierte. Diese Schere ist das zentrale Problem: Wer bereits gut ausgebildet ist, investiert weiter — wer es am meisten bräuchte, bleibt zurück. Ohne gezielte Angebote für Geringqualifizierte verschärft Weiterbildung die Ungleichheit statt sie zu mindern.
+  {% end %}
+
+  ---
 
   ### Nach Altersgruppe
 
-  ![Altersgruppe](/zukunftslabor/charts/weiterbildung_altersgruppe.svg)
+  {% chart(spec="weiterbildung_altersgruppe", alt="Weiterbildungsteilnahme nach Altersgruppe") %}
+  Die Teilnahme fällt ab 45 Jahren deutlich ab. Gerade für die Altersgruppe 45–64 ist Weiterbildung aber entscheidend: Sie müssen noch 15–20 Jahre in einem sich wandelnden Arbeitsmarkt bestehen. Der Rückgang ist weniger ein individuelles Problem als ein Versagen der betrieblichen und institutionellen Angebotsstruktur.
+  {% end %}
+
+  ---
 
   ### Zeitreihe
 
-  ![Zeitreihe](/zukunftslabor/charts/weiterbildung_zeitreihe.svg)
+  {% chart(spec="weiterbildung_zeitreihe", alt="Weiterbildungsteilnahme 2011–2021") %}
+  Ein Jahrzehnt nahezu Stillstand: Die Gesamtquote bewegt sich seit 2011 um die 60%. Trotz Digitalisierungsdebatte, Automatisierungsängsten und politischer Rhetorik hat sich an der tatsächlichen Weiterbildungsbeteiligung wenig geändert.
+  {% end %}
+
+  ---
 
   ### Kreuzanalyse mit Automatisierungsrisiko
 
-  ![Kreuzanalyse](/zukunftslabor/charts/weiterbildung_automatisierung_kreuz.svg)
+  {% chart(spec="weiterbildung_automatisierung_kreuz", alt="Weiterbildungsquote vs. Automatisierungsrisiko nach Branche") %}
+  Der kritischste Befund: Branchen mit dem höchsten Automatisierungsrisiko weisen oft die tiefste Weiterbildungsquote auf. Die am stärksten exponierten Sektoren investieren am wenigsten in die Anpassungsfähigkeit ihrer Beschäftigten — ein strukturelles Risiko, das politische Intervention erfordert.
+  {% end %}
+
+  ---
 
   ## Einschränkungen
 
@@ -279,6 +301,8 @@ Zukunftslabor.NotizTemplate.generate(
   - Branchenspezifische Weiterbildungsquoten teilweise geschätzt
   - Qualität der Weiterbildung nicht erfasst (nur Teilnahme)
   - Korrelation ≠ Kausalität
+
+  ---
 
   ## Datenquellen
 

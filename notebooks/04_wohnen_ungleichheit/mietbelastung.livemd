@@ -84,16 +84,21 @@ chart_kantone =
 ## Mietpreiswachstum (CAGR)
 
 ```elixir
-years = df_mieten |> DF.pull("Jahr") |> Series.distinct() |> Series.sort() |> Series.to_list()
+# Use 2010+ data — BFS survey methodology changed between 2003 and 2010,
+# making pre-2010 values non-comparable (different rent definitions).
+df_mieten_recent = DF.filter(df_mieten, col("Jahr") >= 2010)
+
+years = df_mieten_recent |> DF.pull("Jahr") |> Series.distinct() |> Series.sort() |> Series.to_list()
 first_year = hd(years)
 last_year = List.last(years)
 n_years = last_year - first_year
 
 cagr_data =
-  df_mieten
+  df_mieten_recent
   |> DF.filter(col("Zimmerzahl") == "3 Zimmer")
   |> DF.to_rows()
   |> Enum.group_by(& &1["Kanton"])
+  |> Enum.reject(fn {canton, _} -> canton in ["Total", "Schweiz"] end)
   |> Enum.map(fn {canton, rows} ->
     first = Enum.find(rows, fn r -> r["Jahr"] == first_year end)
     last = Enum.find(rows, fn r -> r["Jahr"] == last_year end)
@@ -106,7 +111,7 @@ cagr_data =
       end
     %{"Kanton" => canton, "CAGR %" => cagr, "Miete_last" => last && last["Miete_CHF"]}
   end)
-  |> Enum.filter(fn d -> d["CAGR %"] > 0 end)
+  |> Enum.filter(fn d -> d["CAGR %"] != 0.0 end)
   |> Enum.sort_by(fn d -> -d["CAGR %"] end)
 
 chart_cagr =
@@ -195,6 +200,11 @@ Zukunftslabor.ChartExport.to_svg(chart_kantone, name: "wohnen_mieten_kantone")
 Zukunftslabor.ChartExport.to_svg(chart_cagr, name: "wohnen_mietpreiswachstum_kantone")
 Zukunftslabor.ChartExport.to_svg(chart_prognose, name: "wohnen_schwelle_prognose")
 
+Zukunftslabor.ChartExport.to_json(chart_quintile, name: "wohnen_mietbelastung_quintile")
+Zukunftslabor.ChartExport.to_json(chart_kantone, name: "wohnen_mieten_kantone")
+Zukunftslabor.ChartExport.to_json(chart_cagr, name: "wohnen_mietpreiswachstum_kantone")
+Zukunftslabor.ChartExport.to_json(chart_prognose, name: "wohnen_schwelle_prognose")
+
 Zukunftslabor.NotizTemplate.generate(
   title: "Mietbelastung: Wann wird es in welchem Kanton kritisch?",
   description: "Das unterste Quintil zahlt 40% für Miete. Bei aktuellen Trends überschreiten weitere Kantone die 30%-Schwelle.",
@@ -204,6 +214,7 @@ Zukunftslabor.NotizTemplate.generate(
   tags: ["wohnen", "mieten", "kantone", "ungleichheit", "prognose"],
   charts: ["wohnen_mietbelastung_quintile.svg", "wohnen_mieten_kantone.svg",
            "wohnen_mietpreiswachstum_kantone.svg", "wohnen_schwelle_prognose.svg"],
+  draft: true,
   summary: """
   Das unterste Quintil zahlt 40% für Miete. Bei aktuellem Mietpreiswachstum und
   1% Einkommenszuwachs überschreiten mehrere Kantone die 30%-Schwelle bis 2035.
@@ -215,18 +226,47 @@ Zukunftslabor.NotizTemplate.generate(
   BFS-SILC-Mietbelastungsquoten. CAGR aus #{first_year}/#{last_year}-Verhältnis.
   Schwellenprognose: Miete×(1+CAGR)^t / Einkommen×(1+1%)^t = 30%.
 
-  ## Ergebnisse
+  ---
 
-  ![Quintile](/zukunftslabor/charts/wohnen_mietbelastung_quintile.svg)
-  ![Kantone](/zukunftslabor/charts/wohnen_mieten_kantone.svg)
-  ![CAGR](/zukunftslabor/charts/wohnen_mietpreiswachstum_kantone.svg)
-  ![Prognose](/zukunftslabor/charts/wohnen_schwelle_prognose.svg)
+  ### Mietbelastung nach Einkommensquintil
+
+  {% chart(spec="wohnen_mietbelastung_quintile", alt="Mietbelastungsquote nach Einkommensquintil") %}
+  Das unterste Quintil gibt rund 40% des verfügbaren Einkommens für Miete aus — weit über der 30%-Schwelle, die als kritisch gilt. Die oberen Quintile liegen bei 15–20%. Die Mietbelastung wirkt wie eine regressive Steuer: Wer weniger verdient, zahlt prozentual mehr.
+  {% end %}
+
+  ---
+
+  ### Mietpreise nach Kanton
+
+  {% chart(spec="wohnen_mieten_kantone", alt="Mietpreise nach Kanton für 3-Zimmer-Wohnungen") %}
+  Die kantonalen Unterschiede sind erheblich: Zürich, Genf und Zug liegen an der Spitze, ländliche Kantone deutlich darunter. Die Grafik zeigt die Preisspanne einer durchschnittlichen 3-Zimmer-Wohnung — der meistverbreitete Wohnungstyp in der Schweiz.
+  {% end %}
+
+  ---
+
+  ### Mietpreiswachstum (CAGR)
+
+  {% chart(spec="wohnen_mietpreiswachstum_kantone", alt="Jährliches Mietpreiswachstum nach Kanton") %}
+  Das jährliche Mietpreiswachstum (CAGR) variiert stark zwischen den Kantonen. Einige Kantone wachsen doppelt so schnell wie andere — bei gleichzeitig stagnierenden Reallöhnen entsteht eine zunehmende Schere. Das Wachstumstempo bestimmt, wann die Belastungsschwelle überschritten wird.
+  {% end %}
+
+  ---
+
+  ### Schwellenprognose
+
+  {% chart(spec="wohnen_schwelle_prognose", alt="Prognose: Wann überschreiten Kantone die 30%-Mietbelastungsschwelle") %}
+  Bei Fortschreibung der aktuellen Trends und einem angenommenen Einkommenswachstum von 1% pro Jahr überschreiten mehrere Kantone die 30%-Schwelle bis 2035. Die Prognose ist konservativ — Neuvertragsmieten liegen oft deutlich über Bestandsmieten.
+  {% end %}
+
+  ---
 
   ## Einschränkungen
 
   - CAGR extrapoliert Vergangenheitstrend
   - Q1-Einkommen nicht kantonal differenziert
   - Bestandsmieten (Neuvertragsmieten oft höher)
+
+  ---
 
   ## Datenquellen
 

@@ -254,6 +254,11 @@ Zukunftslabor.ChartExport.to_svg(chart_netto, name: "migration_nettowanderung")
 Zukunftslabor.ChartExport.to_svg(chart_ueberqualifikation, name: "migration_ueberqualifikation")
 Zukunftslabor.ChartExport.to_svg(chart_sektoren, name: "migration_ueberqualifikation_sektoren")
 
+Zukunftslabor.ChartExport.to_json(chart_herkunft, name: "migration_herkunft_trend")
+Zukunftslabor.ChartExport.to_json(chart_netto, name: "migration_nettowanderung")
+Zukunftslabor.ChartExport.to_json(chart_ueberqualifikation, name: "migration_ueberqualifikation")
+Zukunftslabor.ChartExport.to_json(chart_sektoren, name: "migration_ueberqualifikation_sektoren")
+
 Zukunftslabor.NotizTemplate.generate(
   title: "Talent & Migration: Werden Qualifikationen genutzt — oder verschwendet?",
   description:
@@ -268,6 +273,7 @@ Zukunftslabor.NotizTemplate.generate(
     "migration_ueberqualifikation.svg",
     "migration_ueberqualifikation_sektoren.svg"
   ],
+  draft: true,
   summary: """
   Die Schweiz hat #{latest_mig_year} eine Nettowanderung von +#{net_total} Personen.
   Doch Qualifikationen werden systematisch verschwendet: 36% der Drittstaatsangehörigen
@@ -282,23 +288,39 @@ Zukunftslabor.NotizTemplate.generate(
   Überqualifikation: BFS Strukturerhebung / SAKE (Selbsteinschätzung + formale Qualifikation),
   ergänzt durch OECD Indicators of Talent Attractiveness 2023.
 
-  ## Ergebnisse
+  ---
 
   ### Ausländische Bevölkerung nach Bewilligungstyp
 
-  ![Herkunft Trend](/zukunftslabor/charts/migration_herkunft_trend.svg)
+  {% chart(spec="migration_herkunft_trend", alt="Ausländische Bevölkerung nach Bewilligungstyp im Zeitverlauf") %}
+  Die Zusammensetzung der ausländischen Bevölkerung hat sich verschoben: EU/EFTA-Niederlassungen dominieren, Kurzaufenthalte schwanken konjunkturell. Die Grafik zeigt die Bestandsentwicklung — ein stabiles Wachstum, das die Arbeitskräftenachfrage der Schweizer Wirtschaft widerspiegelt.
+  {% end %}
+
+  ---
 
   ### Nettowanderung nach Herkunft
 
-  ![Nettowanderung](/zukunftslabor/charts/migration_nettowanderung.svg)
+  {% chart(spec="migration_nettowanderung", alt="Nettowanderung nach Herkunftsregion") %}
+  Die Nettowanderung zeigt, wer kommt und wer geht. EU/EFTA-Bürger stellen den Grossteil des Zuzugs — getrieben durch die Personenfreizügigkeit. Drittstaatsangehörige kommen in geringerer Zahl, haben aber die grössten Integrationshürden bei der Berufsanerkennung.
+  {% end %}
+
+  ---
 
   ### Überqualifikationsrate nach Herkunftsgruppe
 
-  ![Überqualifikation](/zukunftslabor/charts/migration_ueberqualifikation.svg)
+  {% chart(spec="migration_ueberqualifikation", alt="Überqualifikationsrate nach Herkunftsgruppe") %}
+  36% der Drittstaatsangehörigen arbeiten unter ihrem Qualifikationsniveau — fast dreimal so viel wie bei Schweizer/innen (13%). Das ist kein Integrationsversagen der Betroffenen, sondern ein strukturelles Problem: Diplomanerkennung, Sprachbarrieren und berufliche Schutzregelungen verhindern den qualifikationsgerechten Einsatz.
+  {% end %}
+
+  ---
 
   ### Sektoren mit hohem Überqualifikationsanteil
 
-  ![Sektoren](/zukunftslabor/charts/migration_ueberqualifikation_sektoren.svg)
+  {% chart(spec="migration_ueberqualifikation_sektoren", alt="Branchen mit höchstem Anteil überqualifizierter Beschäftigter") %}
+  Bestimmte Sektoren «verschwenden» systematisch Talent: Gastgewerbe, Reinigung und Detailhandel beschäftigen besonders viele Überqualifizierte. Das ist Wertschöpfungsverlust in doppeltem Sinn — für die Betroffenen (Lohneinbusse) und für die Volkswirtschaft (ungenutzte Kompetenz).
+  {% end %}
+
+  ---
 
   ## Einschränkungen
 
@@ -306,6 +328,8 @@ Zukunftslabor.NotizTemplate.generate(
   - Nicht alle ausländischen Diplome sind automatisch gleichwertig (Sprachbarrieren, Berufsschutz)
   - Ökonomische Verlustschätzung ist Grössenordnung (Lohndifferenz variiert stark nach Sektor)
   - SAKE-Daten sind Stichprobendaten mit Konfidenzintervallen
+
+  ---
 
   ## Datenquellen
 

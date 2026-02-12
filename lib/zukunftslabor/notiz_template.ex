@@ -17,6 +17,7 @@ defmodule Zukunftslabor.NotizTemplate do
     - `:charts` - list of chart filenames (optional)
     - `:summary` - key finding summary paragraph (required)
     - `:body` - markdown body content (required)
+    - `:draft` - if true, adds `draft = true` to frontmatter (optional, default false)
     - `:date` - ISO date string, defaults to today
 
   Returns the output file path.
@@ -29,6 +30,7 @@ defmodule Zukunftslabor.NotizTemplate do
     evidence = Keyword.fetch!(opts, :evidence)
     tags = Keyword.fetch!(opts, :tags)
     charts = Keyword.get(opts, :charts, [])
+    draft = Keyword.get(opts, :draft, false)
     summary = Keyword.fetch!(opts, :summary)
     body = Keyword.fetch!(opts, :body)
     date = Keyword.get(opts, :date, Date.utc_today() |> Date.to_iso8601())
@@ -38,6 +40,7 @@ defmodule Zukunftslabor.NotizTemplate do
       description: description,
       slug: slug,
       date: date,
+      draft: draft,
       template: "notiz.html",
       category: category,
       evidence: evidence,
@@ -54,6 +57,8 @@ defmodule Zukunftslabor.NotizTemplate do
 
     <!-- more -->
 
+    ---
+
     #{body}
     """
     |> String.trim_leading()
@@ -68,12 +73,15 @@ defmodule Zukunftslabor.NotizTemplate do
   end
 
   defp build_frontmatter(map) do
+    draft_line = if map.draft, do: ["draft = true"], else: []
+
     lines = [
       ~s(title = "#{escape(map.title)}"),
       ~s(description = "#{escape(map.description)}"),
       ~s(slug = "#{map.slug}"),
       ~s(date = #{map.date}),
-      ~s(template = "#{map.template}"),
+      ~s(template = "#{map.template}")
+    ] ++ draft_line ++ [
       "",
       "[extra]",
       ~s(category = "#{map.category}"),

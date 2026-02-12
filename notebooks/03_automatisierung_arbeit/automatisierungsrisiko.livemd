@@ -166,12 +166,12 @@ exposed_data =
     emp = Enum.find(emp_data, fn e -> e["Code"] == r.code end)
     count = if emp, do: emp["Erwerbstätige"], else: 0
     exposed = round(count * r.post / 100)
-    %{"Sektor" => r.s, "Exponierte Stellen (Tsd.)" => exposed, "Risiko %" => r.post}
+    %{"Sektor" => r.s, "Exponierte Stellen Tsd" => exposed, "Risiko %" => r.post}
   end)
-  |> Enum.filter(fn d -> d["Exponierte Stellen (Tsd.)"] > 0 end)
-  |> Enum.sort_by(fn d -> -d["Exponierte Stellen (Tsd.)"] end)
+  |> Enum.filter(fn d -> d["Exponierte Stellen Tsd"] > 0 end)
+  |> Enum.sort_by(fn d -> -d["Exponierte Stellen Tsd"] end)
 
-total_exposed = Enum.map(exposed_data, & &1["Exponierte Stellen (Tsd.)"]) |> Enum.sum()
+total_exposed = Enum.map(exposed_data, & &1["Exponierte Stellen Tsd"]) |> Enum.sum()
 
 chart_exponiert =
   Vl.new(
@@ -182,9 +182,9 @@ chart_exponiert =
   |> Vl.data_from_values(exposed_data)
   |> Vl.mark(:bar, corner_radius_end: 4)
   |> Vl.encode_field(:y, "Sektor", type: :nominal, title: nil, sort: "-x")
-  |> Vl.encode_field(:x, "Exponierte Stellen (Tsd.)",
+  |> Vl.encode_field(:x, "Exponierte Stellen Tsd",
     type: :quantitative,
-    title: "Exponierte Stellen (Tsd.)"
+    title: "Exponierte Stellen Tsd"
   )
   |> Vl.encode(:color, value: "#ef4444")
   |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
@@ -218,6 +218,11 @@ Zukunftslabor.ChartExport.to_svg(chart_pre_post, name: "automatisierung_pre_post
 Zukunftslabor.ChartExport.to_svg(chart_verschiebung, name: "automatisierung_risikoverschiebung")
 Zukunftslabor.ChartExport.to_svg(chart_exponiert, name: "automatisierung_exponierte_stellen")
 
+Zukunftslabor.ChartExport.to_json(chart_beschaeftigung, name: "automatisierung_beschaeftigung")
+Zukunftslabor.ChartExport.to_json(chart_pre_post, name: "automatisierung_pre_post_llm")
+Zukunftslabor.ChartExport.to_json(chart_verschiebung, name: "automatisierung_risikoverschiebung")
+Zukunftslabor.ChartExport.to_json(chart_exponiert, name: "automatisierung_exponierte_stellen")
+
 Zukunftslabor.NotizTemplate.generate(
   title: "Automatisierung: Wie KI die Risikolandkarte verschiebt",
   description:
@@ -232,6 +237,7 @@ Zukunftslabor.NotizTemplate.generate(
     "automatisierung_risikoverschiebung.svg",
     "automatisierung_exponierte_stellen.svg"
   ],
+  draft: true,
   summary: """
   LLM-fähige KI verschiebt das Automatisierungsrisiko: Bürojobs (Finanz,
   Recht, Verwaltung) sind stärker exponiert als vor 2018, manuelle Berufe
@@ -244,21 +250,47 @@ Zukunftslabor.NotizTemplate.generate(
   OECD/Frey-Osborne (2018, Routinetätigkeiten) und IMF AI Preparedness
   Index (2024, LLM-Fähigkeiten). Exponierte Stellen = Beschäftigte × Risikoanteil.
 
-  ## Ergebnisse
+  ---
 
-  ![Beschäftigung](/zukunftslabor/charts/automatisierung_beschaeftigung.svg)
+  ### Beschäftigung nach Branche
 
-  ![Pre vs. Post LLM](/zukunftslabor/charts/automatisierung_pre_post_llm.svg)
+  {% chart(spec="automatisierung_beschaeftigung", alt="Beschäftigung nach Branche in der Schweiz") %}
+  Die Branchenstruktur bildet den Kontext: Gesundheit, Handel und Bau beschäftigen die meisten Personen. Die Verteilung zeigt, welche Sektoren bei einem Automatisierungsschub die grössten absoluten Effekte spüren würden.
+  {% end %}
 
-  ![Risikoverschiebung](/zukunftslabor/charts/automatisierung_risikoverschiebung.svg)
+  ---
 
-  ![Exponierte Stellen](/zukunftslabor/charts/automatisierung_exponierte_stellen.svg)
+  ### Pre vs. Post LLM
+
+  {% chart(spec="automatisierung_pre_post_llm", alt="Automatisierungsrisiko vor und nach LLM-Ära") %}
+  LLM-fähige KI verschiebt die Risikolandkarte grundlegend: Branchen wie Finanz- und Versicherungswesen, öffentliche Verwaltung und Information/Kommunikation sind Post-LLM deutlich stärker exponiert als im klassischen Routinemodell. Manuelle Berufe (Bau, Landwirtschaft) bleiben weitgehend unverändert.
+  {% end %}
+
+  ---
+
+  ### Risikoverschiebung
+
+  {% chart(spec="automatisierung_risikoverschiebung", alt="Richtung und Grösse der Risikoverschiebung durch LLM") %}
+  Die Verschiebung zeigt Richtung und Ausmass der Veränderung. Positive Werte bedeuten erhöhtes Risiko durch LLM. Bürojobs steigen am stärksten — ein Signal, dass klassische Weiterbildungsprogramme für manuelle Berufe allein nicht ausreichen und auch Wissensarbeit in den Fokus rücken muss.
+  {% end %}
+
+  ---
+
+  ### Exponierte Stellen
+
+  {% chart(spec="automatisierung_exponierte_stellen", alt="Absolute Anzahl exponierter Stellen nach Branche") %}
+  In absoluten Zahlen zeigt sich die gesellschaftliche Tragweite: Branchen mit vielen Beschäftigten und hohem Post-LLM-Risiko führen zu zehntausenden potenziell exponierten Stellen. Das bedeutet nicht zwingend Jobverlust — aber die Notwendigkeit systematischer Übergangsgestaltung.
+  {% end %}
+
+  ---
 
   ## Einschränkungen
 
   - Risikoschätzungen sind Branchendurchschnitte, nicht berufsspezifisch
   - Post-LLM-Schätzungen vorläufig (LLM-Fähigkeiten entwickeln sich schnell)
   - Tatsächliche Jobverluste hängen von Regulierung und Komplementarität ab
+
+  ---
 
   ## Datenquellen
 
