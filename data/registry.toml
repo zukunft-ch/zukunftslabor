@@ -59,30 +59,27 @@ processed_as = "mietzinse_kantone.csv"
 [datasets.forschung_ausgaben]
 description = "Forschung und Entwicklung: Aufwendungen nach Sektor (Privatwirtschaft, Hochschulen, Bund)"
 source = "bfs-dam"
-url = "https://dam-api.bfs.admin.ch/hub/api/dam/assets/32048839/master"
+url = "https://dam-api.bfs.admin.ch/hub/api/dam/assets/33948575/master"
 format = "xlsx"
-note = "R&D expenditure by performing sector. Multi-sheet XLSX with years 2004–2021."
+note = "Intramuros F+E-Aufwendungen in der Schweiz (all sectors). From opendata.swiss."
 processed_as = "forschung_ausgaben.csv"
 
 # ─── Energy & Resilience ───────────────────────────────────────────
 
 [datasets.elektrizitaet_produktion]
-description = "Elektrizitätsproduktion nach Energieträger (Wasser, Kernkraft, Solar, Wind, etc.)"
-source = "bfs-pxweb"
-table = "px-x-0800000000_103"
-note = "Electricity production by source. Annual data."
+description = "Elektrizitätsbilanz der Schweiz — Erzeugung, Import, Export, Verbrauch (Jahreswerte)"
+source = "url"
+url = "https://www.uvek-gis.admin.ch/BFE/ogd/32/ogd32_elektrizitaetbilanz_jahreswerte.csv"
+format = "csv"
+note = "BFE OGD electricity balance. Wide CSV: one row per year, columns for hydro run-of-river, storage, nuclear, PV, wind, imports, exports, consumption in GWh."
 processed_as = "elektrizitaet_produktion.csv"
-[datasets.elektrizitaet_produktion.dimensions]
-"Energieträger" = "*"
-"Jahr" = "*"
-"Einheit" = ["0"]
 
 [datasets.energieverbrauch_sektor]
 description = "Endenergieverbrauch nach Verbrauchergruppe (Industrie, Verkehr, Haushalte, Dienstleistungen)"
-source = "bfs-dam"
-url = "https://dam-api.bfs.admin.ch/hub/api/dam/assets/32327177/master"
-format = "xlsx"
-note = "Final energy consumption by sector. XLSX with annual data."
+source = "url"
+url = "https://www.uvek-gis.admin.ch/BFE/ogd/115/ogd115_gest_bilanz.csv"
+format = "csv"
+note = "BFE OGD Gesamtenergiebilanz. Long CSV: Jahr × Rubrik × Energietraeger → TJ. Filter to Endverbrauch rows."
 processed_as = "energieverbrauch_sektor.csv"
 
 # ─── Transitions & Training ───────────────────────────────────────
@@ -106,73 +103,47 @@ processed_as = "weiterbildung_teilnahme.csv"
 [datasets.gesundheitsausgaben]
 description = "Gesundheitsausgaben nach Leistungsart (stationär, ambulant, Medikamente, Verwaltung)"
 source = "bfs-dam"
-url = "https://dam-api.bfs.admin.ch/hub/api/dam/assets/32176750/master"
+url = "https://dam-api.bfs.admin.ch/hub/api/dam/assets/22324819/master"
 format = "xlsx"
-note = "Healthcare expenditure by category. XLSX with annual data 2010–2022."
+note = "Kosten des Gesundheitswesens nach Leistungen. From opendata.swiss."
 processed_as = "gesundheitsausgaben.csv"
 
-# ─── Language & Communication ─────────────────────────────────────
-
-[datasets.sprachen_hauptsprache]
-description = "Hauptsprache(n) der Bevölkerung nach Kanton"
-source = "bfs-pxweb"
-table = "px-x-0100010000_121"
-note = "Main language by canton from structural survey."
-processed_as = "sprachen_hauptsprache.csv"
-[datasets.sprachen_hauptsprache.dimensions]
-"Kanton" = "*"
-"Hauptsprache(n)" = "*"
-"Geschlecht" = ["0"]
-"Staatsangehörigkeit (Kategorie)" = ["0"]
-"Jahr" = "*"
-"Resultat" = ["0"]
-
-[datasets.sprachen_beruf]
-description = "Bei der Arbeit verwendete Sprachen (Deutsch, Französisch, Italienisch, Englisch)"
-source = "bfs-pxweb"
-table = "px-x-0100010000_131"
-note = "Languages used at work. BFS language survey."
-processed_as = "sprachen_beruf.csv"
-[datasets.sprachen_beruf.dimensions]
-"Bei der Arbeit gebrauchte Sprache(n)" = "*"
-"Wirtschaftssektor" = "*"
-"Geschlecht" = ["0"]
-"Jahr" = "*"
-"Resultat" = ["0"]
 
 # ─── Talent & Migration ───────────────────────────────────────────
 
 [datasets.auslaender_aufenthalt]
-description = "Ausländische Wohnbevölkerung nach Aufenthaltsbewilligung und Staatsangehörigkeit"
+description = "Ständige ausländische Wohnbevölkerung nach Anwesenheitsbewilligung und Staatsangehörigkeit"
 source = "bfs-pxweb"
-table = "px-x-0103020000_101"
-note = "Foreign population by permit type and nationality group."
+table = "px-x-0103010000_101"
+note = "Foreign resident population by permit type and nationality. 203 nationalities available."
 processed_as = "auslaender_aufenthalt.csv"
 [datasets.auslaender_aufenthalt.dimensions]
-"Aufenthaltsbewilligung" = "*"
-"Staatsangehörigkeit (Kontinent)" = "*"
-"Geschlecht" = ["0"]
 "Jahr" = "*"
-"Resultat" = ["0"]
+"Kanton" = ["8100"]
+"Bevölkerungstyp" = ["1"]
+"Anwesenheitsbewilligung" = "*"
+"Geschlecht" = ["-99999"]
+"Altersklasse" = ["-99999"]
+"Staatsangehörigkeit" = ["-99999"]
 
 [datasets.wanderungen]
 description = "Internationale Wanderungen: Ein- und Auswanderungen nach Staatsangehörigkeit"
 source = "bfs-dam"
-url = "https://dam-api.bfs.admin.ch/hub/api/dam/assets/32586954/master"
+url = "https://dam-api.bfs.admin.ch/hub/api/dam/assets/36073728/master"
 format = "xlsx"
-note = "Immigration/emigration flows by nationality group. Multi-year XLSX."
+note = "Immigration/emigration flows by nationality group, 1991-2024. From opendata.swiss."
 processed_as = "wanderungen.csv"
 
 # ─── Open State ────────────────────────────────────────────────────
 
 [datasets.ikt_internetnutzung]
-description = "Internetnutzung nach Altersgruppe und Häufigkeit"
+description = "Internetnutzung (Online-Aktivitäten) nach Altersgruppe — BFS Omnibus ICT"
 source = "bfs-pxweb"
-table = "px-x-1604000000_101"
-note = "Internet usage by age group and frequency. BFS Omnibus ICT."
+table = "px-x-1604000000_102"
+note = "Individual online activities by age group. Email (IUEMCH) as proxy for basic internet usage."
 processed_as = "ikt_internetnutzung.csv"
 [datasets.ikt_internetnutzung.dimensions]
-"Internetnutzung" = ["IU11"]
+"Online-Aktivität" = ["IUEMCH"]
 "Geschlecht" = ["0"]
 "Altersklasse" = "*"
 "Bildungsstand" = ["0"]
@@ -185,7 +156,7 @@ processed_as = "ikt_internetnutzung.csv"
 [datasets.verteidigungsausgaben]
 description = "Militärausgaben als Anteil am BIP — World Bank / SIPRI"
 source = "url"
-url = "https://api.worldbank.org/v2/country/CHE;DEU;FRA;AUT;SWE;FIN;NOR;USA/indicator/MS.MIL.XPND.GD.ZS?date=2000:2023&format=csv&source=2"
-format = "csv"
-note = "World Bank API: Military expenditure (% of GDP). ZIP download with CSV inside."
+url = "https://api.worldbank.org/v2/country/CHE;DEU;FRA;AUT;SWE;FIN;NOR;USA/indicator/MS.MIL.XPND.GD.ZS?date=2000:2023&format=json&per_page=500"
+format = "json"
+note = "World Bank API v2 JSON: Military expenditure (% of GDP)."
 processed_as = "verteidigungsausgaben.csv"

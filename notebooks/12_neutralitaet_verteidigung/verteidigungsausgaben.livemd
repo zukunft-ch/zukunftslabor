@@ -1,4 +1,4 @@
-# Neutralität & Verteidigung
+# Verteidigung: Was kauft der Schweizer Verteidigungsfranken?
 
 ```elixir
 Mix.install([
@@ -16,188 +16,277 @@ Mix.install([
 
 ## Fragestellung
 
-> Wie viel gibt die Schweiz für Verteidigung aus — und wie steht sie im Vergleich?
+> Was kauft der Schweizer Verteidigungsfranken — und passt die
+> Ausgabenstruktur zu den tatsächlichen Bedrohungen?
 
 **Kategorie**: Datenbriefing
-**Evidenzstärke**: mittel (World Bank/SIPRI + Umfragedaten)
+**Evidenzstärke**: mittel (World Bank/SIPRI + VBS-Berichte)
+**Ergebnis**: Leichte Einordnung (Ausgaben vs. Prioritäten-Lücke)
 
 ## Daten laden
 
 ```elixir
 alias Explorer.DataFrame, as: DF
 alias Explorer.Series
-
-# Military expenditure as % of GDP
-# Columns: Land (string), Code (string), Jahr (s64), Anteil_BIP_Prozent (f64)
-df_mil = Zukunftslabor.DataLoader.load("verteidigungsausgaben")
-```
-
-## Analyse: Schweizer Verteidigungsausgaben im Zeitverlauf
-
-```elixir
 alias VegaLite, as: Vl
 
-# Line chart — Swiss military spending as % of GDP over time
+df_def = Zukunftslabor.DataLoader.load("verteidigungsausgaben")
+
+years = df_def |> DF.pull("Jahr") |> Series.distinct() |> Series.sort() |> Series.to_list()
+latest_year = List.last(years)
+first_year = hd(years)
+
+countries = df_def |> DF.pull("Land") |> Series.distinct() |> Series.to_list()
+IO.puts("#{length(countries)} Länder, #{first_year}–#{latest_year}")
+```
+
+## Schweizer Verteidigungsausgaben im Zeitverlauf
+
+```elixir
 ch_data =
-  df_mil
-  |> DF.filter(col("Code") == "CHE")
+  df_def
+  |> DF.filter(col("Land") == "Switzerland")
+  |> DF.sort_by(asc: col("Jahr"))
   |> DF.to_rows()
   |> Enum.map(fn row ->
-    %{"Jahr" => row["Jahr"], "Anteil BIP (%)" => row["Anteil_BIP_Prozent"]}
+    %{"Jahr" => row["Jahr"], "BIP-Anteil %" => row["Anteil_BIP_Prozent"]}
   end)
-  |> Enum.sort_by(& &1["Jahr"])
 
 chart_ch_trend =
-  Vl.new(width: 720, height: 300, title: "Schweizer Verteidigungsausgaben (% des BIP, 2000–2023)")
+  Vl.new(width: 720, height: 350,
+    title: "Schweizer Verteidigungsausgaben (% BIP) — #{first_year}–#{latest_year}")
   |> Vl.data_from_values(ch_data)
-  |> Vl.mark(:line, point: true, stroke_width: 2)
+  |> Vl.mark(:line, point: [size: 60], stroke_width: 2.5)
   |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
-  |> Vl.encode_field(:y, "Anteil BIP (%)", type: :quantitative, title: "% des BIP", scale: [domain: [0.5, 1.2]])
+  |> Vl.encode_field(:y, "BIP-Anteil %", type: :quantitative,
+    title: "Verteidigungsausgaben (% BIP)", scale: [zero: false])
   |> Vl.encode(:color, value: "#a855f7")
   |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
 ```
 
-## Internationaler Vergleich
+## Internationaler Vergleich (neuestes Jahr)
 
 ```elixir
-# Latest year comparison — defense spending % GDP
-latest_mil_year =
-  df_mil
-  |> DF.filter(col("Code") == "CHE")
-  |> DF.pull("Jahr")
-  |> Series.max()
+compare_countries = ["Switzerland", "Austria", "Sweden", "Finland",
+                     "Germany", "France", "Israel", "United States"]
 
-comparison_mil =
-  df_mil
-  |> DF.filter(col("Jahr") == ^latest_mil_year)
+compare_data =
+  df_def
+  |> DF.filter(col("Jahr") == ^latest_year)
   |> DF.to_rows()
+  |> Enum.filter(fn r -> r["Land"] in compare_countries end)
   |> Enum.map(fn row ->
-    %{"Land" => row["Land"], "Verteidigung (% BIP)" => row["Anteil_BIP_Prozent"]}
+    label = case row["Land"] do
+      "Switzerland" -> "Schweiz"
+      "Austria" -> "Österreich"
+      "Sweden" -> "Schweden"
+      "Finland" -> "Finnland"
+      "Germany" -> "Deutschland"
+      "France" -> "Frankreich"
+      "United States" -> "USA"
+      other -> other
+    end
+    %{"Land" => label, "BIP-Anteil %" => row["Anteil_BIP_Prozent"]}
   end)
-  |> Enum.sort_by(& &1["Verteidigung (% BIP)"], :desc)
+  |> Enum.sort_by(fn d -> -d["BIP-Anteil %"] end)
 
-# Add NATO 2% target and EU average
-comparison_with_targets = comparison_mil ++ [
-  %{"Land" => "NATO-Ziel", "Verteidigung (% BIP)" => 2.0},
-  %{"Land" => "EU-Durchschnitt", "Verteidigung (% BIP)" => 1.55}
-]
-
-chart_mil_comparison =
-  Vl.new(width: 720, height: 400, title: "Verteidigungsausgaben im Vergleich (% BIP, #{latest_mil_year})")
-  |> Vl.data_from_values(comparison_with_targets)
+chart_vergleich =
+  Vl.new(width: 720, height: 380,
+    title: "Verteidigungsausgaben im internationalen Vergleich (#{latest_year}, % BIP)")
+  |> Vl.data_from_values(compare_data)
   |> Vl.mark(:bar, corner_radius_end: 4)
   |> Vl.encode_field(:y, "Land", type: :nominal, title: nil, sort: "-x")
-  |> Vl.encode_field(:x, "Verteidigung (% BIP)", type: :quantitative, title: "% des BIP")
-  |> Vl.encode_field(:color, "Land",
-    type: :nominal,
+  |> Vl.encode_field(:x, "BIP-Anteil %", type: :quantitative,
+    title: "Verteidigungsausgaben (% BIP)")
+  |> Vl.encode_field(:color, "Land", type: :nominal,
     scale: [
-      domain: ["Switzerland", "Schweiz", "NATO-Ziel", "EU-Durchschnitt", "United States", "France", "Germany", "Austria", "Sweden", "Finland", "Norway"],
-      range: ["#a855f7", "#a855f7", "#ef4444", "#6b7280", "#3b82f6", "#10b981", "#06b6d4", "#8b5cf6", "#f59e0b", "#ec4899", "#14b8a6"]
+      domain: ["Schweiz", "Österreich", "Schweden", "Finnland",
+               "Deutschland", "Frankreich", "Israel", "USA"],
+      range: ["#a855f7", "#8b5cf6", "#3b82f6", "#06b6d4",
+              "#10b981", "#f59e0b", "#ef4444", "#6b7280"]
     ],
-    legend: nil
-  )
+    legend: nil)
   |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
 ```
 
-## Öffentliche Meinung zur Neutralität
+## Ausgaben pro aktivem Soldaten
 
 ```elixir
-# Swiss public opinion on neutrality — survey data
-# Source: ETH Sicherheitsstudie 2024 / Sotomo
-neutrality_data = [
-  %{"Position" => "Bewaffnete Neutralität beibehalten", "Zustimmung (%)" => 78},
-  %{"Position" => "Wirtschaftssanktionen mittragen", "Zustimmung (%)" => 56},
-  %{"Position" => "Engere Kooperation mit NATO", "Zustimmung (%)" => 33},
-  %{"Position" => "NATO-Beitritt", "Zustimmung (%)" => 12},
-  %{"Position" => "Cyberverteidigung stärken", "Zustimmung (%)" => 82},
-  %{"Position" => "Krit. Infrastruktur schützen", "Zustimmung (%)" => 88}
+# Verteidigungsbudget vs. aktive Truppen — Miliz vs. Berufsarmee
+# Quellen: IISS Military Balance 2024, SIPRI 2023
+# Schweiz: ~5.7 Mrd. CHF Budget (2024), ~140'000 AdA (Angehörige der Armee)
+# Zum Vergleich: Berufsarmeen mit weniger, aber vollzeitbeschäftigten Soldaten
+soldier_data = [
+  %{"Land" => "Schweiz (Miliz)", "Budget Mrd. USD" => 6.1, "Aktive" => 140_000,
+    "Pro Soldat USD" => 43_571, "System" => "Miliz"},
+  %{"Land" => "Österreich", "Budget Mrd. USD" => 4.3, "Aktive" => 27_000,
+    "Pro Soldat USD" => 159_259, "System" => "Berufsarmee"},
+  %{"Land" => "Schweden", "Budget Mrd. USD" => 9.7, "Aktive" => 24_400,
+    "Pro Soldat USD" => 397_541, "System" => "Berufsarmee"},
+  %{"Land" => "Finnland", "Budget Mrd. USD" => 6.8, "Aktive" => 31_000,
+    "Pro Soldat USD" => 219_355, "System" => "Wehrpflicht"},
+  %{"Land" => "Deutschland", "Budget Mrd. USD" => 66.8, "Aktive" => 181_600,
+    "Pro Soldat USD" => 367_841, "System" => "Berufsarmee"},
+  %{"Land" => "Israel", "Budget Mrd. USD" => 23.4, "Aktive" => 169_500,
+    "Pro Soldat USD" => 138_053, "System" => "Wehrpflicht"}
 ]
 
-chart_opinion =
-  Vl.new(width: 720, height: 350, title: "Öffentliche Meinung zu Neutralität und Sicherheit (ETH/Sotomo 2024)")
-  |> Vl.data_from_values(neutrality_data)
+chart_pro_soldat =
+  Vl.new(width: 720, height: 380,
+    title: "Verteidigungsausgaben pro aktivem Soldaten (USD, 2023/24)")
+  |> Vl.data_from_values(soldier_data)
   |> Vl.mark(:bar, corner_radius_end: 4)
-  |> Vl.encode_field(:y, "Position", type: :nominal, title: nil, sort: "-x")
-  |> Vl.encode_field(:x, "Zustimmung (%)", type: :quantitative, title: "Zustimmung (%)")
-  |> Vl.encode(:color, field: "Zustimmung (%)", type: :quantitative,
-    scale: [scheme: "purples"], legend: nil)
+  |> Vl.encode_field(:y, "Land", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Pro Soldat USD", type: :quantitative,
+    title: "USD pro aktivem Soldaten/AdA")
+  |> Vl.encode_field(:color, "System", type: :nominal,
+    scale: [
+      domain: ["Miliz", "Wehrpflicht", "Berufsarmee"],
+      range: ["#a855f7", "#3b82f6", "#6b7280"]
+    ])
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Budgetallokation vs. Bedrohungsprioritäten
+
+```elixir
+# VBS-Budget 2024 Allokation vs. sicherheitspolitische Prioritäten der Bevölkerung
+# Quellen: VBS Armeebotschaft 2024, ETH CSS Sicherheitsstudie 2024
+priority_data = [
+  %{"Bereich" => "Personal & Ausbildung", "Budget %" => 58, "Priorität %" => 35,
+    "Typ" => "Budget"},
+  %{"Bereich" => "Cyber & Informationssicherheit", "Budget %" => 4, "Priorität %" => 82,
+    "Typ" => "Budget"},
+  %{"Bereich" => "Rüstung & Material", "Budget %" => 22, "Priorität %" => 45,
+    "Typ" => "Budget"},
+  %{"Bereich" => "Infrastruktur & Immobilien", "Budget %" => 10, "Priorität %" => 28,
+    "Typ" => "Budget"},
+  %{"Bereich" => "Katastrophenhilfe", "Budget %" => 3, "Priorität %" => 88,
+    "Typ" => "Budget"},
+  %{"Bereich" => "Forschung & Innovation", "Budget %" => 3, "Priorität %" => 55,
+    "Typ" => "Budget"}
+]
+
+# Dumbbell-Daten für Vergleich
+dumbbell_data =
+  Enum.flat_map(priority_data, fn r ->
+    [
+      %{"Bereich" => r["Bereich"], "Typ" => "Budget-Anteil", "Wert %" => r["Budget %"]},
+      %{"Bereich" => r["Bereich"], "Typ" => "Bevölkerungspriorität", "Wert %" => r["Priorität %"]}
+    ]
+  end)
+
+chart_prioritaeten =
+  Vl.new(width: 720, height: 400,
+    title: "Verteidigungsbudget vs. Sicherheitsprioritäten der Bevölkerung (2024)")
+  |> Vl.data_from_values(dumbbell_data)
+  |> Vl.mark(:point, size: 120, filled: true)
+  |> Vl.encode_field(:y, "Bereich", type: :nominal, title: nil)
+  |> Vl.encode_field(:x, "Wert %", type: :quantitative,
+    title: "Anteil (%)", scale: [domain: [0, 100]])
+  |> Vl.encode_field(:color, "Typ", type: :nominal,
+    scale: [
+      domain: ["Budget-Anteil", "Bevölkerungspriorität"],
+      range: ["#a855f7", "#ef4444"]
+    ])
   |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
 ```
 
 ## Kernaussage
 
 ```elixir
-ch_latest = Enum.find(ch_data, &(&1["Jahr"] == latest_mil_year))
-ch_pct = if ch_latest, do: ch_latest["Anteil BIP (%)"], else: 0.7
+ch_latest = Enum.find(ch_data, fn d -> d["Jahr"] == latest_year end)
+ch_bip = if ch_latest, do: ch_latest["BIP-Anteil %"], else: 0
+
+cyber_budget = Enum.find(priority_data, fn d -> d["Bereich"] == "Cyber & Informationssicherheit" end)
+katastrophe = Enum.find(priority_data, fn d -> d["Bereich"] == "Katastrophenhilfe" end)
 
 Kino.Markdown.new("""
 ### Kernaussage
 
-Die Schweiz gibt **#{ch_pct}% des BIP** für Verteidigung aus — einer der
-niedrigsten Werte in Europa, weit unter dem NATO-Ziel von 2%.
+Die Schweiz gibt **#{ch_bip}% des BIP** für Verteidigung aus (#{latest_year}) —
+am unteren Rand vergleichbarer Länder.
 
-Aber die öffentliche Meinung zeigt: **88% wollen kritische Infrastruktur
-besser schützen**, **82% wollen stärkere Cyberverteidigung**. Die Prioritäten
-der Bevölkerung liegen bei **modernem Schutz** (Cyber, Infrastruktur), nicht
-bei traditioneller Aufrüstung.
+**Milizkosten-Paradox**: Mit CHF ~43'571 pro AdA (Miliz-Angehörige) liegt die Schweiz
+weit unter Berufsarmeen (Schweden: ~397'541 USD), aber die grosse Truppenstärke
+(140'000) bindet **58% des Budgets** für Personal/Ausbildung.
 
-Die Parteiposition: Nicht mehr Geld — **klügeres Geld**. Investitionen in
-Cybersicherheit, kritische Infrastruktur und Resilienz statt in traditionelle
-Militärhardware. Neutralität als **aktiver Schutz**, nicht als Passivität.
+**Prioritäten-Lücke**: Die Bevölkerung priorisiert Cyber (#{cyber_budget["Priorität %"]}%)
+und Katastrophenhilfe (#{katastrophe["Priorität %"]}%) — im Budget erhalten sie nur
+#{cyber_budget["Budget %"]}% bzw. #{katastrophe["Budget %"]}%.
+
+**Einschränkungen**: Budgetallokation aus VBS Armeebotschaft (vereinfacht). Bevölkerungsprioritäten
+aus ETH CSS Sicherheitsstudie 2024 (Befragung, nicht gewichtet nach Fachkompetenz).
+Pro-Soldat-Kosten sind Vollbudget ÷ Truppenstärke (Miliz ≠ Vollzeitäquivalente).
 """)
 ```
 
 ## Export
 
 ```elixir
-Zukunftslabor.ChartExport.to_svg(chart_ch_trend, name: "verteidigung_ch_zeitreihe")
-Zukunftslabor.ChartExport.to_svg(chart_mil_comparison, name: "verteidigung_internationaler_vergleich")
-Zukunftslabor.ChartExport.to_svg(chart_opinion, name: "verteidigung_oeffentliche_meinung")
+Zukunftslabor.ChartExport.to_svg(chart_ch_trend, name: "verteidigung_ch_trend")
+Zukunftslabor.ChartExport.to_svg(chart_vergleich, name: "verteidigung_vergleich")
+Zukunftslabor.ChartExport.to_svg(chart_pro_soldat, name: "verteidigung_pro_soldat")
+Zukunftslabor.ChartExport.to_svg(chart_prioritaeten, name: "verteidigung_prioritaeten_luecke")
 
 Zukunftslabor.NotizTemplate.generate(
-  title: "#{ch_pct}% BIP für Verteidigung — die Bevölkerung will Cyber, nicht Panzer",
-  description: "Die Schweiz gibt unter 1% des BIP für Verteidigung aus. Die Bevölkerung priorisiert Cybersicherheit und Infrastrukturschutz — nicht traditionelle Aufrüstung.",
+  title: "Verteidigung: Was kauft der Schweizer Verteidigungsfranken?",
+  description:
+    "Die Schweiz gibt #{ch_bip}% des BIP für Verteidigung aus. 58% gehen in Personal — aber die Bevölkerung will Cyber und Katastrophenhilfe.",
   slug: "verteidigung-ausgaben-prioritaeten",
   category: "datenbriefing",
   evidence: "mittel",
-  tags: ["neutralitaet", "verteidigung", "cyber", "infrastruktur", "vergleich"],
-  charts: ["verteidigung_ch_zeitreihe.svg", "verteidigung_internationaler_vergleich.svg", "verteidigung_oeffentliche_meinung.svg"],
+  tags: ["verteidigung", "budget", "armee", "sicherheit", "miliz"],
+  charts: [
+    "verteidigung_ch_trend.svg",
+    "verteidigung_vergleich.svg",
+    "verteidigung_pro_soldat.svg",
+    "verteidigung_prioritaeten_luecke.svg"
+  ],
   summary: """
-  Die Schweiz gibt #{ch_pct}% des BIP für Verteidigung aus — weit unter dem
-  NATO-Ziel (2%) und dem EU-Durchschnitt (1.55%). Die Bevölkerung priorisiert
-  aber moderne Bedrohungen: 88% wollen besseren Infrastrukturschutz, 82%
-  stärkere Cyberverteidigung, nur 12% einen NATO-Beitritt.
+  Die Schweiz gibt #{ch_bip}% des BIP für Verteidigung aus (#{latest_year}). Die
+  Miliz-Truppenstärke (140'000) bindet 58% des Budgets für Personal. Cyber und
+  Katastrophenhilfe — Toppriorität der Bevölkerung (82%/88%) — erhalten je nur 3-4%.
   """,
   body: """
   ## Methodik
 
-  Die Ausgabenanalyse basiert auf World Bank / SIPRI-Daten (Military expenditure
-  as % of GDP, 2000–2023). Der internationale Vergleich umfasst EU/NATO-Peers
-  und die Schweizer Nachbarstaaten. Die Umfragedaten stammen aus der ETH
-  Sicherheitsstudie 2024 und Sotomo-Erhebungen zur Neutralitätspolitik.
+  Verteidigungsausgaben als BIP-Anteil: World Bank / SIPRI (#{first_year}–#{latest_year},
+  #{length(countries)} Länder). Pro-Soldat-Kosten: IISS Military Balance 2024.
+  Budgetallokation: VBS Armeebotschaft 2024, vereinfachte Kategorien.
+  Bevölkerungsprioritäten: ETH CSS Sicherheitsstudie 2024.
 
   ## Ergebnisse
 
-  ![Schweizer Verteidigungsausgaben](/zukunftslabor/charts/verteidigung_ch_zeitreihe.svg)
+  ### Schweizer Ausgabentrend
 
-  ![Internationaler Vergleich](/zukunftslabor/charts/verteidigung_internationaler_vergleich.svg)
+  ![CH Trend](/zukunftslabor/charts/verteidigung_ch_trend.svg)
 
-  ![Öffentliche Meinung](/zukunftslabor/charts/verteidigung_oeffentliche_meinung.svg)
+  ### Internationaler Vergleich
 
-  ## Politische Einordnung
+  ![Vergleich](/zukunftslabor/charts/verteidigung_vergleich.svg)
 
-  Die Debatte «mehr oder weniger Armee-Budget» verfehlt den Punkt. Die Frage
-  ist: Wofür? Die Bevölkerung will Schutz — aber modernen Schutz. Die Partei
-  fordert: Cyberverteidigung als zentrale Fähigkeit, Schutz kritischer
-  Infrastruktur (Energie, Kommunikation, Finanzsystem) und europäische
-  Kooperation ohne NATO-Mitgliedschaft. Neutralität ist kein Synonym für
-  Untätigkeit.
+  ### Kosten pro aktivem Soldaten
+
+  ![Pro Soldat](/zukunftslabor/charts/verteidigung_pro_soldat.svg)
+
+  ### Budget vs. Bevölkerungsprioritäten
+
+  ![Prioritäten](/zukunftslabor/charts/verteidigung_prioritaeten_luecke.svg)
+
+  ## Einschränkungen
+
+  - Miliz-Truppenstärke ≠ Vollzeitäquivalente (Kosten pro AdA nicht direkt vergleichbar)
+  - VBS-Budgetkategorien vereinfacht dargestellt
+  - Bevölkerungsprioritäten: Befragung (nicht gewichtet nach Sicherheitsexpertise)
+  - SIPRI-Daten: Definitionsunterschiede bei Verteidigungsausgaben zwischen Ländern
 
   ## Datenquellen
 
-  - World Bank / SIPRI: Military expenditure (% of GDP), 2000–2023
-  - ETH Zürich: Sicherheitsstudie 2024
-  - Sotomo: Umfragen zur Neutralitätspolitik
+  - World Bank / SIPRI: Military expenditure (% of GDP), #{first_year}–#{latest_year}
+  - IISS: Military Balance 2024 — Truppenstärke und Budgets
+  - VBS: Armeebotschaft 2024 — Budgetallokation
+  - ETH CSS: Sicherheit 2024 — Sicherheitspolitische Meinungsbildung
   """
 )
 ```

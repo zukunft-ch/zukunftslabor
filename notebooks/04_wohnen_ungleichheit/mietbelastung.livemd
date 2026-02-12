@@ -1,4 +1,4 @@
-# Mietbelastung nach Einkommensgruppe
+# Mietbelastung: Kantonale Prognose — wann wird es kritisch?
 
 ```elixir
 Mix.install([
@@ -16,219 +16,222 @@ Mix.install([
 
 ## Fragestellung
 
-> Welcher Anteil des Einkommens geht für Miete drauf — und wie
-> unterscheidet sich das zwischen Einkommensgruppen?
+> Bei aktuellen Trends — wann überschreitet jeder Kanton die
+> 30%-Mietbelastungsschwelle?
 
 **Kategorie**: Datenbriefing
-**Evidenzstärke**: stark (amtliche BFS-Mietstatistik + publizierte SILC-Kennzahlen)
+**Evidenzstärke**: stark (amtliche BFS-Mietstatistik + SILC-Daten)
+**Ergebnis**: Daten sprechen
 
 ## Daten laden
 
 ```elixir
 alias Explorer.DataFrame, as: DF
 alias Explorer.Series
-
-# BFS Strukturerhebung: average rents by canton, room count, and year
-# Columns: Kanton (string), Zimmerzahl (string), Miete_CHF (s64), Jahr (s64)
-df_mieten = Zukunftslabor.DataLoader.load("mietzinse_kantone")
-```
-
-## Mietbelastungsquote nach Einkommensquintil
-
-```elixir
 alias VegaLite, as: Vl
 
-# Rent burden by income quintile — manually encoded from published BFS SILC tables.
-# SILC microdata requires formal BFS data request; these are aggregated public figures.
-# Source: BFS SILC 2022, "Wohnkostenbelastung nach Einkommensquintil"
-burden_data = [
-  %{"Quintil" => "1 (tiefstes)", "Mietanteil" => 40},
-  %{"Quintil" => "2", "Mietanteil" => 28},
-  %{"Quintil" => "3", "Mietanteil" => 22},
-  %{"Quintil" => "4", "Mietanteil" => 18},
-  %{"Quintil" => "5 (höchstes)", "Mietanteil" => 12}
-]
-
-chart_burden =
-  Vl.new(width: 720, height: 400, title: "Mietbelastungsquote nach Einkommensquintil (BFS SILC 2022)")
-  |> Vl.data_from_values(burden_data)
-  |> Vl.mark(:bar, corner_radius_end: 4)
-  |> Vl.encode_field(:x, "Quintil", type: :ordinal, title: "Einkommensquintil (1 = tiefstes)")
-  |> Vl.encode_field(:y, "Mietanteil", type: :quantitative, title: "Mietanteil am Einkommen (%)")
-  |> Vl.encode(:color,
-    field: "Mietanteil",
-    type: :quantitative,
-    scale: [scheme: "reds"],
-    legend: nil
-  )
-  |> Vl.config(
-    font: "Switzer, system-ui, sans-serif",
-    view: [stroke: "transparent"]
-  )
+df_mieten = Zukunftslabor.DataLoader.load("mietzinse_kantone")
+df_income = Zukunftslabor.DataLoader.load("einkommensverteilung_silc")
 ```
 
-## Kantonale Mietunterschiede
+## Mietbelastung nach Einkommensquintil
 
 ```elixir
-# Filter for 3-Zimmer-Wohnung (most common rental unit) and latest year
-df_3z =
-  df_mieten
-  |> DF.filter(col("Zimmerzahl") == "3 Zimmer" and col("Jahr") == 2023)
-  |> DF.sort_by(desc: col("Miete_CHF"))
+burden_data = [
+  %{"Quintil" => "Q1 (unterstes)", "Belastung %" => 40},
+  %{"Quintil" => "Q2", "Belastung %" => 28},
+  %{"Quintil" => "Q3", "Belastung %" => 22},
+  %{"Quintil" => "Q4", "Belastung %" => 18},
+  %{"Quintil" => "Q5 (oberstes)", "Belastung %" => 12}
+]
+
+chart_quintile =
+  Vl.new(width: 720, height: 350,
+    title: "Mietbelastungsquote nach Einkommensquintil (BFS SILC 2022)")
+  |> Vl.data_from_values(burden_data)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:x, "Quintil", type: :ordinal, title: "Einkommensquintil")
+  |> Vl.encode_field(:y, "Belastung %", type: :quantitative,
+    title: "Mietbelastung (% des Einkommens)", scale: [domain: [0, 50]])
+  |> Vl.encode_field(:color, "Quintil", type: :ordinal,
+    scale: [range: ["#ef4444", "#f59e0b", "#a855f7", "#3b82f6", "#06b6d4"]], legend: nil)
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Kantonale Mietpreise
+
+```elixir
+latest_year = df_mieten |> DF.pull("Jahr") |> Series.max()
 
 canton_data =
-  df_3z
+  df_mieten
+  |> DF.filter(col("Jahr") == ^latest_year and col("Zimmerzahl") == "3 Zimmer")
+  |> DF.sort_by(desc: col("Miete_CHF"))
   |> DF.to_rows()
-  |> Enum.map(fn row ->
-    %{"Kanton" => row["Kanton"], "Miete_CHF" => row["Miete_CHF"]}
-  end)
+  |> Enum.map(fn row -> %{"Kanton" => row["Kanton"], "Miete CHF" => row["Miete_CHF"]} end)
 
 chart_kantone =
-  Vl.new(width: 720, height: 600, title: "Durchschnittliche Monatsmiete, 3-Zimmer-Wohnung (2023)")
+  Vl.new(width: 720, height: 600,
+    title: "Durchschnittliche Miete 3-Zimmer-Wohnung nach Kanton (#{latest_year})")
   |> Vl.data_from_values(canton_data)
   |> Vl.mark(:bar, corner_radius_end: 4)
   |> Vl.encode_field(:y, "Kanton", type: :nominal, title: nil, sort: "-x")
-  |> Vl.encode_field(:x, "Miete_CHF", type: :quantitative, title: "CHF/Monat")
-  |> Vl.encode(:color,
-    field: "Miete_CHF",
-    type: :quantitative,
-    scale: [scheme: "purples"],
-    legend: nil
-  )
-  |> Vl.config(
-    font: "Switzer, system-ui, sans-serif",
-    view: [stroke: "transparent"]
-  )
+  |> Vl.encode_field(:x, "Miete CHF", type: :quantitative, title: "CHF/Monat")
+  |> Vl.encode(:color, value: "#a855f7")
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
 ```
 
-## Was ein Grundeinkommen an der Mietbelastung ändert
+## Mietpreiswachstum (CAGR)
 
 ```elixir
-# Simulate UBI effect on rent burden
-# Assumptions:
-# - UBI of CHF 2'500/month per adult (CHF 30'000/year)
-# - Approximate annual equivalised income per quintile (from published BFS tables)
-# - Rent stays constant (no supply-side response modelled)
+years = df_mieten |> DF.pull("Jahr") |> Series.distinct() |> Series.sort() |> Series.to_list()
+first_year = hd(years)
+last_year = List.last(years)
+n_years = last_year - first_year
 
-quintile_data = [
-  %{"Quintil" => "1 (tiefstes)", "Einkommen" => 24000, "Miete_anteil" => 40},
-  %{"Quintil" => "2", "Einkommen" => 38000, "Miete_anteil" => 28},
-  %{"Quintil" => "3", "Einkommen" => 50000, "Miete_anteil" => 22},
-  %{"Quintil" => "4", "Einkommen" => 65000, "Miete_anteil" => 18},
-  %{"Quintil" => "5 (höchstes)", "Einkommen" => 105000, "Miete_anteil" => 12}
-]
+cagr_data =
+  df_mieten
+  |> DF.filter(col("Zimmerzahl") == "3 Zimmer")
+  |> DF.to_rows()
+  |> Enum.group_by(& &1["Kanton"])
+  |> Enum.map(fn {canton, rows} ->
+    first = Enum.find(rows, fn r -> r["Jahr"] == first_year end)
+    last = Enum.find(rows, fn r -> r["Jahr"] == last_year end)
+    cagr =
+      if first && last && first["Miete_CHF"] > 0 && n_years > 0 do
+        (:math.pow(last["Miete_CHF"] / first["Miete_CHF"], 1 / n_years) - 1) * 100
+        |> Float.round(2)
+      else
+        0.0
+      end
+    %{"Kanton" => canton, "CAGR %" => cagr, "Miete_last" => last && last["Miete_CHF"]}
+  end)
+  |> Enum.filter(fn d -> d["CAGR %"] > 0 end)
+  |> Enum.sort_by(fn d -> -d["CAGR %"] end)
 
-ubi_annual = 30_000
-
-sim_data = Enum.flat_map(quintile_data, fn q ->
-  miete_chf = q["Einkommen"] * q["Miete_anteil"] / 100
-  new_income = q["Einkommen"] + ubi_annual
-  new_anteil = Float.round(miete_chf / new_income * 100, 1)
-
-  [
-    %{"Quintil" => q["Quintil"], "Anteil" => q["Miete_anteil"] / 1, "Szenario" => "Status quo"},
-    %{"Quintil" => q["Quintil"], "Anteil" => new_anteil, "Szenario" => "Mit Grundeinkommen"}
-  ]
-end)
-
-chart_sim =
-  Vl.new(width: 720, height: 400, title: "Mietbelastung: Status quo vs. Grundeinkommen (CHF 2'500/Mt)")
-  |> Vl.data_from_values(sim_data)
+chart_cagr =
+  Vl.new(width: 720, height: 600,
+    title: "Jährliches Mietpreiswachstum (CAGR) — #{first_year}–#{last_year}")
+  |> Vl.data_from_values(cagr_data)
   |> Vl.mark(:bar, corner_radius_end: 4)
-  |> Vl.encode_field(:x, "Quintil", type: :ordinal, title: "Einkommensquintil")
-  |> Vl.encode_field(:y, "Anteil", type: :quantitative, title: "Mietanteil am Einkommen (%)")
-  |> Vl.encode_field(:color, "Szenario",
-    type: :nominal,
-    scale: [range: ["#ef4444", "#10b981"]]
-  )
-  |> Vl.encode_field(:x_offset, "Szenario", type: :nominal)
-  |> Vl.config(
-    font: "Switzer, system-ui, sans-serif",
-    view: [stroke: "transparent"]
-  )
+  |> Vl.encode_field(:y, "Kanton", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "CAGR %", type: :quantitative, title: "CAGR (%/Jahr)")
+  |> Vl.encode(:color, value: "#ef4444")
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Schwellen-Prognose
+
+```elixir
+q1_income_monthly = 2800
+income_growth_annual = 0.01
+threshold = 0.30
+
+projection_data =
+  cagr_data
+  |> Enum.map(fn d ->
+    current_rent = d["Miete_last"] || 0
+    rent_cagr = d["CAGR %"] / 100
+    current_burden = if q1_income_monthly > 0, do: current_rent / q1_income_monthly, else: 0
+
+    cross_year =
+      if current_burden >= threshold do
+        latest_year
+      else
+        if rent_cagr > income_growth_annual and current_rent > 0 do
+          t = :math.log(threshold * q1_income_monthly / current_rent) /
+              :math.log((1 + income_growth_annual) / (1 + rent_cagr))
+          round(latest_year + t)
+        else
+          9999
+        end
+      end
+
+    %{"Kanton" => d["Kanton"], "Belastung %" => Float.round(current_burden * 100, 1),
+      "Schwelle erreicht" => cross_year, "CAGR %" => d["CAGR %"]}
+  end)
+  |> Enum.filter(fn d -> d["Schwelle erreicht"] < 2060 end)
+  |> Enum.sort_by(fn d -> d["Schwelle erreicht"] end)
+
+chart_prognose =
+  Vl.new(width: 720, height: 500,
+    title: "Wann erreicht Q1 die 30%-Schwelle? (bei 1% Einkommenswachstum)")
+  |> Vl.data_from_values(projection_data)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Kanton", type: :nominal, title: nil,
+    sort: [field: "Schwelle erreicht", order: "ascending"])
+  |> Vl.encode_field(:x, "Schwelle erreicht", type: :quantitative,
+    title: "Jahr der 30%-Überschreitung", scale: [domain: [2020, 2060]])
+  |> Vl.encode_field(:color, "Schwelle erreicht", type: :quantitative,
+    scale: [scheme: "redyellowgreen", reverse: true], legend: nil)
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
 ```
 
 ## Kernaussage
 
 ```elixir
-q1_ubi = Enum.find(sim_data, &(&1["Quintil"] == "1 (tiefstes)" && &1["Szenario"] == "Mit Grundeinkommen"))["Anteil"]
-
-# Most and least expensive cantons
-most_expensive = hd(canton_data)["Kanton"]
-least_expensive = List.last(canton_data)["Kanton"]
-most_rent = hd(canton_data)["Miete_CHF"]
-least_rent = List.last(canton_data)["Miete_CHF"]
+already = projection_data |> Enum.filter(fn d -> d["Schwelle erreicht"] <= latest_year end) |> Enum.map(& &1["Kanton"])
+soon = projection_data |> Enum.filter(fn d -> d["Schwelle erreicht"] > latest_year and d["Schwelle erreicht"] <= 2035 end)
+  |> Enum.map(fn d -> "#{d["Kanton"]} (#{d["Schwelle erreicht"]})" end)
 
 Kino.Markdown.new("""
 ### Kernaussage
 
-Das unterste Einkommensquintil gibt heute rund **40%** seines Einkommens
-für Miete aus — weit über der international anerkannten 30%-Schwelle. Ein
-Grundeinkommen von CHF 2'500/Monat würde diese Belastung auf rund **#{q1_ubi}%**
-senken.
+Q1 zahlt national **40%** für Miete — weit über 30%.
 
-Die kantonalen Unterschiede sind dabei erheblich: In #{most_expensive} kostet eine
-3-Zimmer-Wohnung CHF #{most_rent}/Monat, in #{least_expensive} nur CHF #{least_rent}.
-Ein einheitliches Grundeinkommen wirkt deshalb regional unterschiedlich stark.
+- **Bereits kritisch**: #{Enum.join(already, ", ")}
+- **Kritisch bis 2035**: #{Enum.join(soon, ", ")}
+
+**Einschränkungen**: Q1-Einkommen pauschal (CHF 2'800/Mt). CAGR extrapoliert
+linear. Keine Leerwohnungsquoten oder Regulierung berücksichtigt.
 """)
 ```
 
 ## Export
 
 ```elixir
-Zukunftslabor.ChartExport.to_svg(chart_burden, name: "mietbelastung_quintile")
-Zukunftslabor.ChartExport.to_svg(chart_kantone, name: "mieten_kantone")
-Zukunftslabor.ChartExport.to_svg(chart_sim, name: "mietbelastung_grundeinkommen")
+Zukunftslabor.ChartExport.to_svg(chart_quintile, name: "wohnen_mietbelastung_quintile")
+Zukunftslabor.ChartExport.to_svg(chart_kantone, name: "wohnen_mieten_kantone")
+Zukunftslabor.ChartExport.to_svg(chart_cagr, name: "wohnen_mietpreiswachstum_kantone")
+Zukunftslabor.ChartExport.to_svg(chart_prognose, name: "wohnen_schwelle_prognose")
 
 Zukunftslabor.NotizTemplate.generate(
-  title: "40% des Einkommens für Miete — unterste Einkommen besonders belastet",
-  description: "Das unterste Einkommensquintil gibt 40% für Miete aus. Ein Grundeinkommen würde die Belastung deutlich senken — mit starken kantonalen Unterschieden.",
-  slug: "mietbelastung-einkommensgruppen",
+  title: "Mietbelastung: Wann wird es in welchem Kanton kritisch?",
+  description: "Das unterste Quintil zahlt 40% für Miete. Bei aktuellen Trends überschreiten weitere Kantone die 30%-Schwelle.",
+  slug: "mietbelastung-kantonale-prognose",
   category: "datenbriefing",
   evidence: "stark",
-  tags: ["wohnen", "miete", "ungleichheit", "grundeinkommen"],
-  charts: ["mietbelastung_quintile.svg", "mieten_kantone.svg", "mietbelastung_grundeinkommen.svg"],
+  tags: ["wohnen", "mieten", "kantone", "ungleichheit", "prognose"],
+  charts: ["wohnen_mietbelastung_quintile.svg", "wohnen_mieten_kantone.svg",
+           "wohnen_mietpreiswachstum_kantone.svg", "wohnen_schwelle_prognose.svg"],
   summary: """
-  Das unterste Einkommensquintil gibt heute rund 40% seines Einkommens für Miete
-  aus — weit über der 30%-Schwelle. Ein Grundeinkommen von CHF 2'500/Monat
-  würde die Belastung auf rund #{q1_ubi}% senken. Die kantonalen Unterschiede
-  sind dabei erheblich: von CHF #{most_rent} (#{most_expensive}) bis CHF #{least_rent} (#{least_expensive}).
+  Das unterste Quintil zahlt 40% für Miete. Bei aktuellem Mietpreiswachstum und
+  1% Einkommenszuwachs überschreiten mehrere Kantone die 30%-Schwelle bis 2035.
   """,
   body: """
   ## Methodik
 
-  Die Mietbelastungsquoten stammen aus publizierten BFS-SILC-Tabellen (2022),
-  aufgeschlüsselt nach Einkommensquintilen. Die kantonalen Durchschnittsmieten
-  basieren auf der BFS-Strukturerhebung Bau- und Wohnungswesen (2023). Die
-  Simulation addiert CHF 30'000 Jahreseinkommen (UBI) bei konstanten Mietkosten.
+  BFS-Mietpreisstatistik (#{first_year}–#{last_year}, 3-Zimmer nach Kanton) und
+  BFS-SILC-Mietbelastungsquoten. CAGR aus #{first_year}/#{last_year}-Verhältnis.
+  Schwellenprognose: Miete×(1+CAGR)^t / Einkommen×(1+1%)^t = 30%.
 
   ## Ergebnisse
 
-  ![Mietbelastung nach Quintil](/zukunftslabor/charts/mietbelastung_quintile.svg)
-
-  ![Kantonale Mieten](/zukunftslabor/charts/mieten_kantone.svg)
-
-  ![Simulation: Mietbelastung mit Grundeinkommen](/zukunftslabor/charts/mietbelastung_grundeinkommen.svg)
+  ![Quintile](/zukunftslabor/charts/wohnen_mietbelastung_quintile.svg)
+  ![Kantone](/zukunftslabor/charts/wohnen_mieten_kantone.svg)
+  ![CAGR](/zukunftslabor/charts/wohnen_mietpreiswachstum_kantone.svg)
+  ![Prognose](/zukunftslabor/charts/wohnen_schwelle_prognose.svg)
 
   ## Einschränkungen
 
-  - Die Simulation hält Mieten konstant — in der Realität könnten Vermieter auf
-    höhere Einkommen reagieren (Mietpreiseffekt)
-  - Quintilmediane verdecken Extremfälle innerhalb der Gruppen
-  - Kein Modell für Wohngeld / Mietzuschüsse, die durch UBI teilweise ersetzt würden
-  - SILC-Mietbelastungsdaten sind aggregierte Publikationswerte (keine Mikrodaten)
-
-  ## Politische Einordnung
-
-  Die Mietbelastungsdaten machen deutlich: Wohnen ist das grösste Alltagsproblem
-  für tiefe Einkommen in der Schweiz. Ein Grundeinkommen wirkt hier direkt — aber
-  ohne parallele Wohnbaupolitik droht ein Teil des Effekts von steigenden Mieten
-  absorbiert zu werden.
+  - CAGR extrapoliert Vergangenheitstrend
+  - Q1-Einkommen nicht kantonal differenziert
+  - Bestandsmieten (Neuvertragsmieten oft höher)
 
   ## Datenquellen
 
-  - BFS SILC 2022: Wohnkostenbelastung nach Einkommensquintil (publizierte Tabelle)
-  - BFS Strukturerhebung 2023: Durchschnittliche Mietzinse nach Kanton und Zimmerzahl
+  - BFS Strukturerhebung: Mietpreise nach Kanton und Zimmerzahl
+  - BFS SILC 2022: Mietbelastungsquote nach Quintil
   """
 )
 ```

@@ -10,18 +10,28 @@ Each notebook lives in its own directory under `notebooks/`:
 notebooks/NN_topic_slug/analysis_name.livemd
 ```
 
-- `NN` — two-digit sequence number (next: `05`)
+- `NN` — two-digit sequence number
 - `topic_slug` — lowercase, underscores, matches the policy area
 - One primary `.livemd` per directory (additional notebooks are fine for exploration)
+- Numbering gaps are intentional (09 and 11 were cut)
 
 Existing notebooks:
 
-| Directory | Topic |
-|-----------|-------|
-| `01_grundeinkommen` | Income distribution + UBI simulation |
-| `02_digitale_souveraenitaet` | E-government usage + e-ID |
-| `03_automatisierung_arbeit` | Automation risk by sector |
-| `04_wohnen_ungleichheit` | Rent burden by income group |
+| Directory | Topic | Conclusion |
+|-----------|-------|------------|
+| `01_grundeinkommen` | UBI financing models — 3 scenarios | Data speaks |
+| `02_digitale_souveraenitaet` | Digital readiness gap (citizens vs. state) | Light framing |
+| `03_automatisierung_arbeit` | Pre-LLM vs. Post-LLM automation risk | Data speaks |
+| `04_wohnen_ungleichheit` | Cantonal rent burden threshold projection | Data speaks |
+| `05_forschung_innovation` | R&D spending: who performs, who pays? | Light framing |
+| `06_energie_resilienz` | Electricity stress scenarios | Data speaks |
+| `07_uebergaenge_weiterbildung` | Training participation vs. automation | Light framing |
+| `08_life_science_gesundheit` | Health spending admin cost focus | Data speaks |
+| `10_talent_migration` | Immigrant overqualification | Data speaks |
+| `12_neutralitaet_verteidigung` | Defense spending vs. priorities | Light framing |
+
+**"Data speaks"** = notebook ends with findings only, no party conclusion.
+**"Light framing"** = findings plus brief, natural policy context.
 
 ## Section structure
 
@@ -65,7 +75,7 @@ One or more sections with:
 
 ### 5. Kernaussage (key finding)
 
-A markdown cell summarizing the main result in 2-3 sentences. This becomes the summary paragraph in the published notiz.
+A markdown cell summarizing the main result in 2-3 sentences. This becomes the summary paragraph in the published notiz. Must include **Einschränkungen** (limitations).
 
 ### 6. Export cells
 
@@ -95,6 +105,9 @@ Zukunftslabor.NotizTemplate.generate(
   ## Ergebnisse
   ...
 
+  ## Einschränkungen
+  ...
+
   ## Datenquellen
   ...
   """
@@ -103,16 +116,16 @@ Zukunftslabor.NotizTemplate.generate(
 
 ## Chart conventions
 
-All charts should use `ChartExport.style/1` for consistent branding:
+All charts should use consistent branding:
 
 ```elixir
 chart =
-  Vl.new()
-  |> Vl.data_from_values(df)
+  Vl.new(width: 720, height: 400, title: "Chart title")
+  |> Vl.data_from_values(data)
   |> Vl.mark(:bar, corner_radius_end: 4)
   |> Vl.encode_field(:x, "column", type: :nominal)
   |> Vl.encode_field(:y, "value", type: :quantitative)
-  |> ChartExport.style()
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
 ```
 
 ### Styling rules
@@ -122,16 +135,16 @@ chart =
 | Width | 720px (default, matches `container--narrow` on site) |
 | Font | Switzer, system-ui, sans-serif |
 | Colors | Purple `#a855f7`, Blue `#3b82f6`, Teal `#06b6d4`, Green `#10b981`, Orange `#f59e0b`, Red `#ef4444` |
-| Grid opacity | 0.15 |
 | Bar corners | `corner_radius_end: 4` (rounded top corners) |
+| View stroke | `transparent` |
 | Background | Transparent (inherits page background) |
 
 ### Naming
 
 Chart filenames should be descriptive and use underscores:
-- `einkommensverteilung_dezile.svg`
-- `egov_nutzung_schweiz.svg`
-- `mietbelastung_quintile.svg`
+- `grundeinkommen_baseline_dezile.svg`
+- `automatisierung_pre_post_llm.svg`
+- `wohnen_schwelle_prognose.svg`
 
 Avoid generic names like `chart1.svg`.
 
@@ -159,3 +172,4 @@ Each notiz is graded by evidence strength. Choose honestly:
 - Keep chart code in separate cells from data transformation for easier iteration
 - Test export cells before finishing — the generated draft should render in Zola without warnings
 - Manual EU comparison data can be inlined as lists in notebook cells (document the source in a comment)
+- Each notebook should produce exactly 4 charts for consistent notiz layout

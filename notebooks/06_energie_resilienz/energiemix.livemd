@@ -1,4 +1,4 @@
-# Energie & Resilienz
+# Energie & Resilienz: Stressszenarien für die Schweizer Stromversorgung
 
 ```elixir
 Mix.install([
@@ -16,129 +16,295 @@ Mix.install([
 
 ## Fragestellung
 
-> Wie resilient ist die Schweizer Stromversorgung — und wo liegen die Abhängigkeiten?
+> Was passiert mit der Schweizer Stromversorgung unter Stress —
+> Trockenheit plus Atomausstieg?
 
 **Kategorie**: Datenbriefing
-**Evidenzstärke**: stark (amtliche BFS/BFE-Elektrizitätsstatistik)
+**Evidenzstärke**: stark (amtliche BFE-Elektrizitätsstatistik)
+**Ergebnis**: Daten sprechen (Ingenieuranalyse)
 
 ## Daten laden
 
 ```elixir
 alias Explorer.DataFrame, as: DF
 alias Explorer.Series
-
-# Electricity production by source
-df_elec = Zukunftslabor.DataLoader.load("elektrizitaet_produktion")
-```
-
-## Analyse: Schweizer Strommix
-
-```elixir
 alias VegaLite, as: Vl
 
-# Stacked bar — electricity mix over time
-# Group by year and energy source
-elec_data =
-  df_elec
-  |> DF.to_rows()
-  |> Enum.map(fn row ->
-    %{
-      "Jahr" => row["Jahr"],
-      "Energieträger" => row["Energieträger"],
-      "Produktion" => row["value"]
-    }
-  end)
-  |> Enum.filter(& &1["Produktion"] && &1["Produktion"] > 0)
+# Elektrizitätsbilanz (BFE OGD): Jahr × Quelle × GWh
+df_elec = Zukunftslabor.DataLoader.load("elektrizitaet_produktion")
 
-chart_mix =
-  Vl.new(width: 720, height: 400, title: "Schweizer Elektrizitätsproduktion nach Energieträger")
-  |> Vl.data_from_values(elec_data)
-  |> Vl.mark(:bar)
-  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
-  |> Vl.encode_field(:y, "Produktion", type: :quantitative, title: "GWh", stack: :zero)
-  |> Vl.encode_field(:color, "Energieträger",
-    type: :nominal,
-    scale: [range: ["#3b82f6", "#a855f7", "#f59e0b", "#06b6d4", "#10b981", "#6b7280"]]
-  )
-  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+# Endenergieverbrauch nach Sektor (BFE OGD): Jahr × Sektor × TJ
+df_energy = Zukunftslabor.DataLoader.load("energieverbrauch_sektor")
 ```
 
-## Internationaler Vergleich: Erneuerbarer Strom
+## Schweizer Strommix (reale BFE-Daten)
 
 ```elixir
-# Renewable electricity share — international comparison
-# Source: IEA/Eurostat 2023
-renewable_data = [
-  %{"Land" => "Schweiz", "Erneuerbarer Anteil (%)" => 76},
-  %{"Land" => "Schweden", "Erneuerbarer Anteil (%)" => 68},
-  %{"Land" => "Dänemark", "Erneuerbarer Anteil (%)" => 84},
-  %{"Land" => "Österreich", "Erneuerbarer Anteil (%)" => 78},
-  %{"Land" => "Deutschland", "Erneuerbarer Anteil (%)" => 52},
-  %{"Land" => "Frankreich", "Erneuerbarer Anteil (%)" => 27},
-  %{"Land" => "EU-Durchschnitt", "Erneuerbarer Anteil (%)" => 44}
+# Produktionsquellen für Stacked Area
+production_sources = [
+  "Laufkraftwerke", "Speicherkraftwerke", "Kernkraftwerke",
+  "Photovoltaik", "Wind", "Andere Erneuerbare + Abfälle"
 ]
 
-chart_renewable =
-  Vl.new(width: 720, height: 350, title: "Erneuerbarer Stromanteil im Vergleich (2023)")
-  |> Vl.data_from_values(renewable_data)
-  |> Vl.mark(:bar, corner_radius_end: 4)
-  |> Vl.encode_field(:y, "Land", type: :nominal, title: nil, sort: "-x")
-  |> Vl.encode_field(:x, "Erneuerbarer Anteil (%)", type: :quantitative, title: "Anteil (%)")
-  |> Vl.encode_field(:color, "Land",
+# Nur ab 2000 (davor fehlen Aufschlüsselungen)
+mix_data =
+  df_elec
+  |> DF.to_rows()
+  |> Enum.filter(fn row ->
+    row["Quelle"] in production_sources and row["Jahr"] >= 2000
+  end)
+
+chart_strommix =
+  Vl.new(
+    width: 720,
+    height: 420,
+    title: "Schweizer Elektrizitätsproduktion nach Quelle (2000–2024, BFE)"
+  )
+  |> Vl.data_from_values(mix_data)
+  |> Vl.mark(:area, opacity: 0.85)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "GWh",
+    type: :quantitative,
+    title: "Produktion (GWh)",
+    stack: :zero
+  )
+  |> Vl.encode_field(:color, "Quelle",
     type: :nominal,
     scale: [
-      domain: ["Schweiz", "EU-Durchschnitt", "Dänemark", "Österreich", "Schweden", "Deutschland", "Frankreich"],
-      range: ["#a855f7", "#6b7280", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#3b82f6"]
+      domain: production_sources,
+      range: ["#3b82f6", "#06b6d4", "#f59e0b", "#a855f7", "#10b981", "#6b7280"]
+    ]
+  )
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
+  )
+```
+
+## Endenergieverbrauch nach Sektor
+
+```elixir
+# Sektoren ohne "Total" und "Stat. Differenz"
+sector_data =
+  df_energy
+  |> DF.to_rows()
+  |> Enum.filter(fn row ->
+    row["Sektor"] not in ["Total", "Stat. Differenz inkl. Landwirtschaft"] and
+    row["Jahr"] >= 2000
+  end)
+
+chart_verbrauch =
+  Vl.new(
+    width: 720,
+    height: 400,
+    title: "Endenergieverbrauch nach Sektor — Schweiz (2000–2024, BFE)"
+  )
+  |> Vl.data_from_values(sector_data)
+  |> Vl.mark(:area, opacity: 0.8)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "Verbrauch_TJ",
+    type: :quantitative,
+    title: "Endenergieverbrauch (TJ)",
+    stack: :zero
+  )
+  |> Vl.encode_field(:color, "Sektor",
+    type: :nominal,
+    scale: [
+      domain: ["Verkehr", "Haushalte", "Industrie", "Dienstleistungen"],
+      range: ["#ef4444", "#3b82f6", "#f59e0b", "#10b981"]
+    ]
+  )
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
+  )
+```
+
+## Stressszenarien: Was passiert bei Trockenheit + Atomausstieg?
+
+```elixir
+# Letzte verfügbare Jahreswerte aus der Elektrizitätsbilanz
+latest_elec_year =
+  df_elec |> DF.pull("Jahr") |> Series.max()
+
+latest_by_source =
+  df_elec
+  |> DF.filter(col("Jahr") == ^latest_elec_year)
+  |> DF.to_rows()
+  |> Map.new(fn row -> {row["Quelle"], row["GWh"]} end)
+
+hydro = Map.get(latest_by_source, "Laufkraftwerke", 0) +
+        Map.get(latest_by_source, "Speicherkraftwerke", 0)
+nuclear = Map.get(latest_by_source, "Kernkraftwerke", 0)
+solar = Map.get(latest_by_source, "Photovoltaik", 0)
+wind = Map.get(latest_by_source, "Wind", 0)
+other = Map.get(latest_by_source, "Andere Erneuerbare + Abfälle", 0) +
+        Map.get(latest_by_source, "Fossile Erzeugung", 0)
+consumption = Map.get(latest_by_source, "Landesverbrauch", 0)
+pump = Map.get(latest_by_source, "Speicherpumpen", 0)
+
+total_production = hydro + nuclear + solar + wind + other - pump
+
+IO.puts("Produktion #{latest_elec_year}:")
+IO.puts("  Wasserkraft:   #{hydro} GWh (#{Float.round(hydro / total_production * 100, 1)}%)")
+IO.puts("  Kernkraft:     #{nuclear} GWh (#{Float.round(nuclear / total_production * 100, 1)}%)")
+IO.puts("  Solar:         #{solar} GWh")
+IO.puts("  Wind:          #{wind} GWh")
+IO.puts("  Andere:        #{other} GWh")
+IO.puts("  Pumpspeicher:  -#{pump} GWh")
+IO.puts("  ──────────────────")
+IO.puts("  Nettoproduktion: #{total_production} GWh")
+IO.puts("  Landesverbrauch: #{consumption} GWh")
+
+# 4 Szenarien
+scenarios = [
+  %{
+    "Szenario" => "A: Baseline",
+    "Produktion" => total_production,
+    "Lücke" => max(consumption - total_production, 0),
+    "order" => 0
+  },
+  %{
+    "Szenario" => "B: Trockenjahr (-30% Hydro)",
+    "Produktion" => round(total_production - hydro * 0.30),
+    "Lücke" => max(consumption - (total_production - hydro * 0.30), 0) |> round(),
+    "order" => 1
+  },
+  %{
+    "Szenario" => "C: Atomausstieg",
+    "Produktion" => total_production - nuclear,
+    "Lücke" => max(consumption - (total_production - nuclear), 0),
+    "order" => 2
+  },
+  %{
+    "Szenario" => "D: Trockenjahr + Atomausstieg",
+    "Produktion" => round(total_production - nuclear - hydro * 0.30),
+    "Lücke" => max(consumption - (total_production - nuclear - hydro * 0.30), 0) |> round(),
+    "order" => 3
+  }
+]
+
+# Chart-Daten: gestapelte Balken (Produktion + Lücke = Verbrauch)
+scenario_chart_data =
+  Enum.flat_map(scenarios, fn s ->
+    [
+      %{"Szenario" => s["Szenario"], "Typ" => "Eigenproduktion", "GWh" => s["Produktion"], "order" => s["order"]},
+      %{"Szenario" => s["Szenario"], "Typ" => "Importlücke", "GWh" => s["Lücke"], "order" => s["order"]}
+    ]
+  end)
+
+chart_szenarien =
+  Vl.new(
+    width: 720,
+    height: 400,
+    title: "Stressszenarien: Eigenproduktion vs. Importlücke (#{latest_elec_year}er Basis)"
+  )
+  |> Vl.data_from_values(scenario_chart_data)
+  |> Vl.mark(:bar, corner_radius_end: 3)
+  |> Vl.encode_field(:x, "Szenario",
+    type: :nominal,
+    sort: [field: "order"],
+    title: nil,
+    axis: [label_angle: -15]
+  )
+  |> Vl.encode_field(:y, "GWh",
+    type: :quantitative,
+    title: "GWh",
+    stack: :zero
+  )
+  |> Vl.encode_field(:color, "Typ",
+    type: :nominal,
+    scale: [
+      domain: ["Eigenproduktion", "Importlücke"],
+      range: ["#3b82f6", "#ef4444"]
+    ]
+  )
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
+  )
+```
+
+## Importkosten der Lücke
+
+```elixir
+# Europäische Spotpreise: ~EUR 80–100/MWh (Durchschnitt 2023–2024)
+# CHF/EUR: ~0.95
+eur_spot_price = 90  # EUR/MWh
+chf_per_eur = 0.95
+chf_per_mwh = eur_spot_price / chf_per_eur
+
+cost_data =
+  Enum.map(scenarios, fn s ->
+    cost_mio = Float.round(s["Lücke"] * 1000 * chf_per_mwh / 1_000_000_000, 2)
+    import_pct = if consumption > 0, do: Float.round(s["Lücke"] / consumption * 100, 1), else: 0.0
+
+    %{
+      "Szenario" => s["Szenario"],
+      "Importlücke GWh" => s["Lücke"],
+      "Importabhängigkeit %" => import_pct,
+      "Kosten Mrd. CHF" => cost_mio,
+      "order" => s["order"]
+    }
+  end)
+
+chart_kosten =
+  Vl.new(
+    width: 720,
+    height: 350,
+    title: "Geschätzte Importkosten pro Szenario (bei #{eur_spot_price} EUR/MWh)"
+  )
+  |> Vl.data_from_values(cost_data)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:x, "Szenario",
+    type: :nominal,
+    sort: [field: "order"],
+    title: nil,
+    axis: [label_angle: -15]
+  )
+  |> Vl.encode_field(:y, "Kosten Mrd. CHF",
+    type: :quantitative,
+    title: "Importkosten (Mrd. CHF/Jahr)"
+  )
+  |> Vl.encode_field(:color, "Szenario",
+    type: :nominal,
+    scale: [
+      domain: Enum.map(scenarios, & &1["Szenario"]),
+      range: ["#6b7280", "#f59e0b", "#3b82f6", "#ef4444"]
     ],
     legend: nil
   )
-  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
-```
-
-## Netto-Stromimporte/-exporte
-
-```elixir
-# Switzerland is a net importer in winter, net exporter in summer
-# Manual data: net imports by year (positive = import, negative = export)
-# Source: BFE Elektrizitätsstatistik
-import_data = [
-  %{"Jahr" => 2015, "Netto-Import (GWh)" => 1_200},
-  %{"Jahr" => 2016, "Netto-Import (GWh)" => -2_100},
-  %{"Jahr" => 2017, "Netto-Import (GWh)" => -3_400},
-  %{"Jahr" => 2018, "Netto-Import (GWh)" => -1_800},
-  %{"Jahr" => 2019, "Netto-Import (GWh)" => -5_700},
-  %{"Jahr" => 2020, "Netto-Import (GWh)" => -5_600},
-  %{"Jahr" => 2021, "Netto-Import (GWh)" => 2_600},
-  %{"Jahr" => 2022, "Netto-Import (GWh)" => 3_500},
-  %{"Jahr" => 2023, "Netto-Import (GWh)" => -6_400}
-]
-
-chart_imports =
-  Vl.new(width: 720, height: 300, title: "Netto-Stromimporte der Schweiz (positiv = Import, negativ = Export)")
-  |> Vl.data_from_values(import_data)
-  |> Vl.mark(:bar, corner_radius_end: 4)
-  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
-  |> Vl.encode_field(:y, "Netto-Import (GWh)", type: :quantitative, title: "GWh")
-  |> Vl.encode(:color,
-    condition: [test: "datum['Netto-Import (GWh)'] > 0", value: "#ef4444"],
-    value: "#10b981"
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
   )
-  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
 ```
 
 ## Kernaussage
 
 ```elixir
+scenario_d = List.last(scenarios)
+cost_d = List.last(cost_data)
+
 Kino.Markdown.new("""
 ### Kernaussage
 
-Die Schweiz produziert rund **98% CO₂-armen Strom** (Wasserkraft + Kernkraft).
-Das ist eine enorme Stärke — aber die **saisonale Abhängigkeit** (Winterimporte)
-und die **Konzentration auf Wasserkraft** (~57%) schaffen Verwundbarkeiten.
+Die Schweiz produziert #{total_production} GWh Strom (#{latest_elec_year}) — davon
+**#{Float.round(hydro / total_production * 100, 0)}% Wasserkraft** und
+**#{Float.round(nuclear / total_production * 100, 0)}% Kernkraft**.
 
-Die Frage ist nicht «erneuerbar ja/nein» — sie ist längst beantwortet. Die
-Frage ist: **Wie wird die Versorgung resilient**, wenn Trockenheit die
-Wasserkraft schwächt und Kernkraftwerke vom Netz gehen?
+Vier Stressszenarien zeigen die Verwundbarkeit:
+
+| Szenario | Importlücke | Abhängigkeit | Kosten |
+|---|---|---|---|
+| **A: Baseline** | #{hd(scenarios)["Lücke"]} GWh | #{hd(cost_data)["Importabhängigkeit %"]}% | #{hd(cost_data)["Kosten Mrd. CHF"]} Mrd. |
+| **B: Trockenjahr** | #{Enum.at(scenarios, 1)["Lücke"]} GWh | #{Enum.at(cost_data, 1)["Importabhängigkeit %"]}% | #{Enum.at(cost_data, 1)["Kosten Mrd. CHF"]} Mrd. |
+| **C: Atomausstieg** | #{Enum.at(scenarios, 2)["Lücke"]} GWh | #{Enum.at(cost_data, 2)["Importabhängigkeit %"]}% | #{Enum.at(cost_data, 2)["Kosten Mrd. CHF"]} Mrd. |
+| **D: Beides** | #{scenario_d["Lücke"]} GWh | #{cost_d["Importabhängigkeit %"]}% | #{cost_d["Kosten Mrd. CHF"]} Mrd. |
+
+Im Worst Case (Trockenjahr + Atomausstieg) müsste die Schweiz
+**#{cost_d["Importabhängigkeit %"]}%** ihres Strombedarfs importieren —
+Kosten: **#{cost_d["Kosten Mrd. CHF"]} Mrd. CHF/Jahr** bei aktuellen Spotpreisen.
 
 Resilienz ist Ingenieurwesen, nicht Ideologie.
 """)
@@ -147,51 +313,75 @@ Resilienz ist Ingenieurwesen, nicht Ideologie.
 ## Export
 
 ```elixir
-Zukunftslabor.ChartExport.to_svg(chart_mix, name: "energiemix_strommix")
-Zukunftslabor.ChartExport.to_svg(chart_renewable, name: "energiemix_erneuerbar_vergleich")
-Zukunftslabor.ChartExport.to_svg(chart_imports, name: "energiemix_netto_importe")
+Zukunftslabor.ChartExport.to_svg(chart_strommix, name: "energie_strommix_real")
+Zukunftslabor.ChartExport.to_svg(chart_verbrauch, name: "energie_verbrauch_sektoren")
+Zukunftslabor.ChartExport.to_svg(chart_szenarien, name: "energie_szenarien_vergleich")
+Zukunftslabor.ChartExport.to_svg(chart_kosten, name: "energie_importluecke_kosten")
 
 Zukunftslabor.NotizTemplate.generate(
-  title: "98% CO₂-arm — aber wie resilient ist die Schweizer Stromversorgung?",
-  description: "Die Schweiz hat einen der saubersten Strommixe Europas, doch saisonale Importabhängigkeit und Wasserkraft-Konzentration schaffen Verwundbarkeiten.",
-  slug: "energiemix-resilienz",
+  title: "Stresstest Strom: Was passiert bei Trockenheit plus Atomausstieg?",
+  description:
+    "Vier Szenarien zeigen, wie verwundbar die Schweizer Stromversorgung ist — von der Baseline bis zum Worst Case aus Trockenheit und Kernkraft-Abschaltung.",
+  slug: "energieresilienz-stressszenarien",
   category: "datenbriefing",
   evidence: "stark",
-  tags: ["energie", "resilienz", "strom", "infrastruktur", "vergleich"],
-  charts: ["energiemix_strommix.svg", "energiemix_erneuerbar_vergleich.svg", "energiemix_netto_importe.svg"],
+  tags: ["energie", "resilienz", "strom", "szenarien", "infrastruktur"],
+  charts: [
+    "energie_strommix_real.svg",
+    "energie_verbrauch_sektoren.svg",
+    "energie_szenarien_vergleich.svg",
+    "energie_importluecke_kosten.svg"
+  ],
   summary: """
-  Die Schweiz produziert 98% ihres Stroms CO₂-arm (Wasser + Kernkraft) und liegt
-  mit 76% erneuerbarem Anteil weit über dem EU-Durchschnitt (44%). Aber die
-  Winterlücke (Netto-Importe bis 3.5 TWh) und die Wasserkraft-Dominanz
-  machen das System verwundbar — besonders bei Trockenheit und AKW-Abschaltungen.
+  Vier Stressszenarien auf Basis realer BFE-Daten (#{latest_elec_year}) zeigen:
+  Im Worst Case (Trockenjahr + Atomausstieg) müsste die Schweiz
+  #{cost_d["Importabhängigkeit %"]}% ihres Stroms importieren — Kosten
+  #{cost_d["Kosten Mrd. CHF"]} Mrd. CHF/Jahr bei aktuellen Spotpreisen.
   """,
   body: """
   ## Methodik
 
-  Die Analyse kombiniert BFS/BFE-Elektrizitätsstatistik (Produktion nach Energieträger)
-  mit IEA/Eurostat-Daten für den internationalen Vergleich. Die Netto-Importdaten
-  stammen aus der BFE-Elektrizitätsstatistik (physische Stromflüsse an den Grenzen).
+  Grundlage ist die BFE-Elektrizitätsbilanz (OGD, #{latest_elec_year}). Vier Szenarien
+  modifizieren die Produktionszahlen des Basisjahres:
+
+  - **A — Baseline**: Reale Produktion #{latest_elec_year}
+  - **B — Trockenjahr**: -30% Wasserkraftproduktion (historisch plausibel, z.B. 2022)
+  - **C — Atomausstieg**: Kernkraftwerke abgeschaltet (-#{nuclear} GWh)
+  - **D — Kombiniert**: Trockenjahr + Atomausstieg
+
+  Importkosten berechnet bei #{eur_spot_price} EUR/MWh (europ. Spotpreis-Durchschnitt).
+  Endenergieverbrauch nach Sektor aus der BFE-Gesamtenergiebilanz.
 
   ## Ergebnisse
 
-  ![Strommix](/zukunftslabor/charts/energiemix_strommix.svg)
+  ### Strommix
 
-  ![Erneuerbarer Anteil im Vergleich](/zukunftslabor/charts/energiemix_erneuerbar_vergleich.svg)
+  ![Strommix](/zukunftslabor/charts/energie_strommix_real.svg)
 
-  ![Netto-Stromimporte](/zukunftslabor/charts/energiemix_netto_importe.svg)
+  ### Endenergieverbrauch nach Sektor
 
-  ## Politische Einordnung
+  ![Verbrauch nach Sektor](/zukunftslabor/charts/energie_verbrauch_sektoren.svg)
 
-  Die Partei-Position ist klar: Resilienz durch Diversifikation (Solar, Wind,
-  Speicher), nicht durch Festhalten an einzelnen Technologien. Die Winterlücke
-  erfordert Speicherlösungen (Pumpspeicher, Batterien, Power-to-X) und robuste
-  europäische Vernetzung — nicht autarkische Fantasien.
+  ### Stressszenarien
+
+  ![Szenarien-Vergleich](/zukunftslabor/charts/energie_szenarien_vergleich.svg)
+
+  ### Importkosten
+
+  ![Importkosten](/zukunftslabor/charts/energie_importluecke_kosten.svg)
+
+  ## Einschränkungen
+
+  - Statische Szenarien (kein Ausbau Solar/Wind, keine Nachfragereduktion)
+  - Importpreise schwanken stark (2022: bis 400 EUR/MWh)
+  - Saisonale Effekte nicht modelliert (Winterlücke > Jahresdurchschnitt)
+  - Keine Speichereffekte (Pumpspeicher, Batterien)
 
   ## Datenquellen
 
-  - BFS/BFE: Schweizerische Elektrizitätsstatistik (Produktion nach Energieträger)
-  - BFE: Schweizerische Gesamtenergiestatistik (Import/Export)
-  - IEA / Eurostat: Renewable electricity share by country (2023)
+  - BFE: Schweizerische Elektrizitätsbilanz (OGD, Jahreswerte)
+  - BFE: Schweizerische Gesamtenergiebilanz (Endenergieverbrauch nach Sektor)
+  - ENTSO-E: Europäische Strompreise (Day-Ahead-Spotmarkt)
   """
 )
 ```

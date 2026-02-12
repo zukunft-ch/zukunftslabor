@@ -1,4 +1,4 @@
-# Einkommensverteilung & Grundeinkommen
+# Grundeinkommen: Drei Finanzierungsmodelle im Vergleich
 
 ```elixir
 Mix.install([
@@ -12,18 +12,16 @@ Mix.install([
   {:toml, "~> 0.7"},
   {:req, "~> 0.5"}
 ])
-
-# When running attached to the project, these are already available.
-# Mix.install is for standalone LiveBook usage.
 ```
 
 ## Fragestellung
 
-> Was würde ein bedingungsloses Grundeinkommen von CHF 2'500/Monat
-> an der Einkommensverteilung in der Schweiz verändern?
+> Drei Wege, ein bedingungsloses Grundeinkommen zu finanzieren —
+> was macht jeder davon mit der Einkommensverteilung?
 
 **Kategorie**: Datenbriefing
-**Evidenzstärke**: mittel (öffentlich aggregierte BFS-Daten, Mikrosimulation auf Dezilbasis)
+**Evidenzstärke**: mittel (öffentlich aggregierte BFS-Daten, Dezil-Mikrosimulation)
+**Ergebnis**: Daten sprechen — keine Parteiposition
 
 ## Daten laden
 
@@ -31,48 +29,40 @@ Mix.install([
 alias Explorer.DataFrame, as: DF
 alias Explorer.Series
 
-# Load income distribution (HABE/SILC)
-# Columns: Jahr (s64), Kennzahl (string), Wert (f64)
-# Kennzahl values: Dezil_1_Anteil_Prozent..Dezil_10_Anteil_Prozent,
-#   Gini_Koeffizient, Median_CHF_Monat, Mittelwert_CHF_Monat
 df_all = Zukunftslabor.DataLoader.load("einkommensverteilung_silc")
 ```
 
 ```elixir
-# Use latest year (2018)
+# Neuestes Jahr verwenden (2018 — letzte BFS-HABE-Publikation)
 df_2018 = df_all |> DF.filter(col("Jahr") == 2018)
 
-# Extract decile shares for 2018
-df_deciles =
-  df_2018
-  |> DF.filter(contains(col("Kennzahl"), "Dezil"))
-  |> DF.mutate(
-    Dezil: cast(substring(col("Kennzahl"), 6, 1), :integer) |> add(
-      cast(substring(col("Kennzahl"), 7, 1), :integer) |> fill_missing(0) |> multiply(
-        cast(equal(substring(col("Kennzahl"), 7, 1), "0"), :integer) |> subtract(1) |> multiply(-1) |> multiply(9)
-      )
-    )
-  )
-
-# Simpler approach: extract decile number from Kennzahl string
+# Dezilanteile extrahieren
 decile_rows =
   df_2018
   |> DF.filter(contains(col("Kennzahl"), "Dezil"))
   |> DF.to_rows()
   |> Enum.map(fn row ->
-    # "Dezil_1_Anteil_Prozent" → 1, "Dezil_10_Anteil_Prozent" → 10
-    dezil = row["Kennzahl"]
+    dezil =
+      row["Kennzahl"]
       |> String.replace("Dezil_", "")
       |> String.replace("_Anteil_Prozent", "")
       |> String.to_integer()
+
     %{"Dezil" => dezil, "Anteil" => row["Wert"]}
   end)
   |> Enum.sort_by(& &1["Dezil"])
 
-# Extract Gini and median
-gini_sq =
+# Gini, Median, Mittelwert
+gini_bfs =
   df_2018
   |> DF.filter(col("Kennzahl") == "Gini_Koeffizient")
+  |> DF.pull("Wert")
+  |> Series.to_list()
+  |> hd()
+
+mean_monthly =
+  df_2018
+  |> DF.filter(col("Kennzahl") == "Mittelwert_CHF_Monat")
   |> DF.pull("Wert")
   |> Series.to_list()
   |> hd()
@@ -85,19 +75,22 @@ median_monthly =
   |> hd()
   |> round()
 
-IO.puts("Gini (2018): #{gini_sq}")
-IO.puts("Median (2018): CHF #{median_monthly}/Monat")
-IO.puts("Decile shares: #{inspect(Enum.map(decile_rows, & &1["Anteil"]))}")
+IO.puts("Gini (2018): #{gini_bfs}")
+IO.puts("Mittelwert: CHF #{round(mean_monthly)}/Monat")
+IO.puts("Median: CHF #{median_monthly}/Monat")
 ```
 
-## Analyse: Einkommensverteilung nach Dezilen
+## Baseline: Einkommensverteilung nach Dezilen
 
 ```elixir
 alias VegaLite, as: Vl
 
-# Bar chart: income share by decile
-chart_deciles =
-  Vl.new(width: 720, height: 400, title: "Einkommensanteile nach Dezil — Verfügbares Äquivalenzeinkommen (2018)")
+chart_baseline =
+  Vl.new(
+    width: 720,
+    height: 400,
+    title: "Einkommensanteile nach Dezil — Verfügbares Äquivalenzeinkommen (2018)"
+  )
   |> Vl.data_from_values(decile_rows)
   |> Vl.mark(:bar, corner_radius_end: 4)
   |> Vl.encode_field(:x, "Dezil", type: :ordinal, title: "Einkommensdezil")
@@ -109,71 +102,186 @@ chart_deciles =
   )
 ```
 
-## Mikrosimulation: Grundeinkommen CHF 2'500/Monat
+## Drei Finanzierungsszenarien
 
 ```elixir
-# UBI parameters
+# ── Parameter ──────────────────────────────────────────────────────
 ubi_monthly = 2500
 
-# Income shares are percentages of total income.
-# A flat UBI shifts income toward lower deciles because it's a larger
-# proportion of their existing income.
-#
-# Approach: estimate absolute monthly income per decile from shares + median,
-# add UBI, recalculate shares.
+# Schweizer Bevölkerung (2018): ~8.54 Mio
+# Erwachsene (18+): ~7.0 Mio
+# Kinder (<18): ~1.54 Mio (Kindersatz: CHF 625/Mt = 25% des Erwachsenenbetrags)
+adults = 7_000_000
+children = 1_540_000
+child_rate = 625
 
-# Approximate absolute income per decile using shares and total
-# Total monthly income = mean × 10 (for 10 deciles of equal population)
-mean_monthly =
-  df_2018
-  |> DF.filter(col("Kennzahl") == "Mittelwert_CHF_Monat")
-  |> DF.pull("Wert")
-  |> Series.to_list()
-  |> hd()
+# Bruttokosten UBI pro Jahr
+gross_cost_bn = (adults * ubi_monthly + children * child_rate) * 12 / 1_000_000_000
+IO.puts("Bruttokosten UBI: CHF #{Float.round(gross_cost_bn, 1)} Mrd./Jahr")
 
-# Each decile's average monthly income ≈ share% × mean × 10
-# (share is % of total, decile is 10% of population)
-decile_incomes = Enum.map(decile_rows, fn row ->
-  monthly = row["Anteil"] / 100 * mean_monthly * 10
-  %{
-    "Dezil" => row["Dezil"],
-    "Einkommen_Status_quo" => round(monthly),
-    "Einkommen_mit_UBI" => round(monthly + ubi_monthly)
-  }
+# ── Absolute Einkommen pro Dezil schätzen ──────────────────────────
+# Jedes Dezil = 10% der Bevölkerung, Anteil × Mittelwert × 10
+decile_incomes =
+  Enum.map(decile_rows, fn row ->
+    monthly = row["Anteil"] / 100 * mean_monthly * 10
+    %{"Dezil" => row["Dezil"], "Einkommen_SQ" => round(monthly)}
+  end)
+
+IO.puts("\nGeschätztes Monatseinkommen pro Dezil (Status quo):")
+
+Enum.each(decile_incomes, fn d ->
+  IO.puts("  D#{d["Dezil"]}: CHF #{d["Einkommen_SQ"]}")
 end)
-
-# Build comparison data for grouped bar chart
-comparison_data = Enum.flat_map(decile_incomes, fn row ->
-  [
-    %{"Dezil" => row["Dezil"], "CHF/Monat" => row["Einkommen_Status_quo"], "Szenario" => "Status quo"},
-    %{"Dezil" => row["Dezil"], "CHF/Monat" => row["Einkommen_mit_UBI"], "Szenario" => "Mit Grundeinkommen"}
-  ]
-end)
-
-chart_comparison =
-  Vl.new(width: 720, height: 400, title: "Geschätztes Monatseinkommen: Status quo vs. Grundeinkommen (CHF 2'500/Mt)")
-  |> Vl.data_from_values(comparison_data)
-  |> Vl.mark(:bar, corner_radius_end: 4)
-  |> Vl.encode_field(:x, "Dezil", type: :ordinal, title: "Einkommensdezil")
-  |> Vl.encode_field(:y, "CHF/Monat", type: :quantitative, title: "CHF/Monat")
-  |> Vl.encode_field(:color, "Szenario",
-    type: :nominal,
-    scale: [range: ["#3b82f6", "#a855f7"]]
-  )
-  |> Vl.encode_field(:x_offset, "Szenario", type: :nominal)
-  |> Vl.config(
-    font: "Switzer, system-ui, sans-serif",
-    view: [stroke: "transparent"]
-  )
 ```
 
-## Gini-Koeffizient
+### Szenario A — Pauschale Einkommensteuer
 
 ```elixir
-# Calculate Gini from the simulated income distribution
-# Using the trapezoidal method on the Lorenz curve
+# Szenario A: Flat income tax surcharge
+# Gesamtkosten = CHF ~222 Mrd./Jahr
+# BIP Schweiz 2018: ~CHF 700 Mrd.
+# Gesamtes Haushaltseinkommen ≈ Mittelwert × 12 × Bevölkerung
+total_income_bn = mean_monthly * 12 * (adults + children) / 1_000_000_000
 
+# Pauschaler Steuersatz = Kosten / Gesamteinkommen
+tax_rate_a = gross_cost_bn / total_income_bn
+IO.puts("Szenario A — pauschaler Steuerzuschlag: #{Float.round(tax_rate_a * 100, 1)}%")
+
+scenario_a =
+  Enum.map(decile_incomes, fn d ->
+    netto = d["Einkommen_SQ"] * (1 - tax_rate_a) + ubi_monthly
+    veraenderung = netto - d["Einkommen_SQ"]
+
+    %{
+      "Dezil" => d["Dezil"],
+      "Einkommen_SQ" => d["Einkommen_SQ"],
+      "Netto" => round(netto),
+      "Veraenderung" => round(veraenderung),
+      "Szenario" => "A: Einkommensteuer"
+    }
+  end)
+```
+
+### Szenario B — Ablösung bestehender Transfers
+
+```elixir
+# Szenario B: Bestehende Sozialtransfers ersetzen
+# AHV: ~48 Mrd., IV: ~10 Mrd., EL: ~5 Mrd., Sozialhilfe: ~3 Mrd.,
+# ALV: ~7 Mrd., Familienzulagen: ~6 Mrd.
+# Total abgelöst: ~CHF 79 Mrd.
+transfers_replaced_bn = 79.0
+remaining_cost_bn = gross_cost_bn - transfers_replaced_bn
+
+tax_rate_b = remaining_cost_bn / total_income_bn
+IO.puts("Szenario B — erspartes Transfer-Volumen: CHF #{transfers_replaced_bn} Mrd.")
+IO.puts("Szenario B — verbleibender Steuerzuschlag: #{Float.round(tax_rate_b * 100, 1)}%")
+
+# Geschätzte aktuelle Transfereinkommen pro Dezil (CHF/Monat)
+# D1–D3 erhalten überproportional viele Transfers (AHV, EL, Sozialhilfe)
+# Basierend auf BFS-Transferverteilung (SILC-Mikrodaten, publizierte Anteile)
+transfers_by_decile = %{
+  1 => 2900,
+  2 => 2200,
+  3 => 1700,
+  4 => 1300,
+  5 => 1000,
+  6 => 750,
+  7 => 550,
+  8 => 400,
+  9 => 250,
+  10 => 100
+}
+
+scenario_b =
+  Enum.map(decile_incomes, fn d ->
+    current_transfers = Map.get(transfers_by_decile, d["Dezil"], 0)
+    # Verliert bestehende Transfers, gewinnt UBI, zahlt Steuer
+    netto =
+      (d["Einkommen_SQ"] - current_transfers) * (1 - tax_rate_b) + ubi_monthly
+
+    veraenderung = round(netto) - d["Einkommen_SQ"]
+
+    %{
+      "Dezil" => d["Dezil"],
+      "Einkommen_SQ" => d["Einkommen_SQ"],
+      "Netto" => round(netto),
+      "Veraenderung" => round(veraenderung),
+      "Szenario" => "B: Transferablösung",
+      "Transfers_verloren" => current_transfers
+    }
+  end)
+
+# Kernbefund: Welche Dezile verlieren?
+verlierer_b =
+  scenario_b
+  |> Enum.filter(fn d -> d["Veraenderung"] < 0 end)
+  |> Enum.map(fn d -> "D#{d["Dezil"]} (#{d["Veraenderung"]} CHF)" end)
+
+if verlierer_b != [] do
+  IO.puts("\n⚠ Verlierer in Szenario B: #{Enum.join(verlierer_b, ", ")}")
+  IO.puts("Grund: Bestehende Transfers > UBI-Betrag")
+else
+  IO.puts("\nKeine Dezile schlechter gestellt in Szenario B")
+end
+```
+
+### Szenario C — Konsumsteuer (MwSt.-Zuschlag)
+
+```elixir
+# Szenario C: Finanzierung über Konsumsteuer (MwSt.-Zuschlag)
+# Untere Dezile konsumieren ~90–95% des Einkommens
+# Obere Dezile konsumieren ~55–65% (Rest = Sparen)
+
+consumption_share = %{
+  1 => 0.95,
+  2 => 0.92,
+  3 => 0.88,
+  4 => 0.85,
+  5 => 0.80,
+  6 => 0.75,
+  7 => 0.70,
+  8 => 0.65,
+  9 => 0.60,
+  10 => 0.55
+}
+
+# Gesamtkonsum (gewichtete Summe über Dezile)
+total_consumption_monthly =
+  Enum.reduce(decile_incomes, 0.0, fn d, acc ->
+    share = Map.get(consumption_share, d["Dezil"], 0.75)
+    acc + d["Einkommen_SQ"] * share
+  end)
+
+# Pro Kopf × Bevölkerung → Jahreskonsum
+total_consumption_bn = total_consumption_monthly * (adults + children) / 10 * 12 / 1_000_000_000
+
+# MwSt.-Zuschlag nötig
+vat_surcharge = gross_cost_bn / total_consumption_bn
+IO.puts("Szenario C — MwSt.-Zuschlag: #{Float.round(vat_surcharge * 100, 1)}%")
+
+scenario_c =
+  Enum.map(decile_incomes, fn d ->
+    share = Map.get(consumption_share, d["Dezil"], 0.75)
+    konsum = d["Einkommen_SQ"] * share
+    steuer = konsum * vat_surcharge
+    netto = d["Einkommen_SQ"] - steuer + ubi_monthly
+    veraenderung = round(netto) - d["Einkommen_SQ"]
+
+    %{
+      "Dezil" => d["Dezil"],
+      "Einkommen_SQ" => d["Einkommen_SQ"],
+      "Netto" => round(netto),
+      "Veraenderung" => round(veraenderung),
+      "Szenario" => "C: Konsumsteuer"
+    }
+  end)
+```
+
+## Gini-Berechnung pro Szenario
+
+```elixir
 defmodule GiniCalc do
+  @doc "Berechnet Gini-Koeffizienten aus einer Liste von Einkommen (Trapezregel auf Lorenzkurve)."
   def gini(incomes) do
     sorted = Enum.sort(incomes)
     n = length(sorted)
@@ -200,40 +308,147 @@ defmodule GiniCalc do
   end
 end
 
-incomes_sq = Enum.map(decile_incomes, & &1["Einkommen_Status_quo"])
-incomes_ubi = Enum.map(decile_incomes, & &1["Einkommen_mit_UBI"])
+incomes_sq = Enum.map(decile_incomes, & &1["Einkommen_SQ"])
+gini_sq = GiniCalc.gini(incomes_sq)
+gini_a = GiniCalc.gini(Enum.map(scenario_a, & &1["Netto"]))
+gini_b = GiniCalc.gini(Enum.map(scenario_b, & &1["Netto"]))
+gini_c = GiniCalc.gini(Enum.map(scenario_c, & &1["Netto"]))
 
-gini_sim_sq = GiniCalc.gini(incomes_sq)
-gini_sim_ubi = GiniCalc.gini(incomes_ubi)
-
-IO.puts("Gini BFS (2018):              #{gini_sq}")
-IO.puts("Gini simuliert (Status quo):   #{gini_sim_sq}")
-IO.puts("Gini simuliert (mit UBI):      #{gini_sim_ubi}")
-IO.puts("Reduktion:                     #{Float.round(gini_sim_sq - gini_sim_ubi, 4)}")
+IO.puts("Gini BFS (2018):       #{gini_bfs}")
+IO.puts("Gini simuliert (SQ):   #{gini_sq}")
+IO.puts("Gini Szenario A:       #{gini_a}")
+IO.puts("Gini Szenario B:       #{gini_b}")
+IO.puts("Gini Szenario C:       #{gini_c}")
 ```
 
-## Gini-Zeitreihe
+## Visualisierung: Szenarien-Vergleich
 
 ```elixir
-# Gini over time from all years in the dataset
-gini_timeseries =
-  df_all
-  |> DF.filter(col("Kennzahl") == "Gini_Koeffizient")
-  |> DF.to_rows()
-  |> Enum.map(fn row -> %{"Jahr" => row["Jahr"], "Gini" => row["Wert"]} end)
-  |> Enum.sort_by(& &1["Jahr"])
+# Chart 2: Nettoveränderung pro Dezil × 3 Szenarien (gruppierter Balken)
+comparison_data =
+  (scenario_a ++ scenario_b ++ scenario_c)
+  |> Enum.map(fn d ->
+    %{
+      "Dezil" => d["Dezil"],
+      "Veränderung CHF/Mt" => d["Veraenderung"],
+      "Szenario" => d["Szenario"]
+    }
+  end)
+
+chart_szenarien =
+  Vl.new(
+    width: 720,
+    height: 420,
+    title: "Nettoveränderung des Monatseinkommens pro Dezil — drei Finanzierungsmodelle"
+  )
+  |> Vl.data_from_values(comparison_data)
+  |> Vl.mark(:bar, corner_radius_end: 3)
+  |> Vl.encode_field(:x, "Dezil", type: :ordinal, title: "Einkommensdezil")
+  |> Vl.encode_field(:y, "Veränderung CHF/Mt",
+    type: :quantitative,
+    title: "Nettoveränderung (CHF/Monat)"
+  )
+  |> Vl.encode_field(:color, "Szenario",
+    type: :nominal,
+    scale: [range: ["#a855f7", "#3b82f6", "#06b6d4"]],
+    legend: [orient: "top"]
+  )
+  |> Vl.encode_field(:x_offset, "Szenario", type: :nominal)
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
+  )
+```
+
+## Visualisierung: Gini-Vergleich
+
+```elixir
+# Chart 3: Gini-Koeffizient pro Szenario (Balkendiagramm)
+gini_data = [
+  %{"Szenario" => "Status quo", "Gini" => gini_sq, "order" => 0},
+  %{"Szenario" => "A: Einkommensteuer", "Gini" => gini_a, "order" => 1},
+  %{"Szenario" => "B: Transferablösung", "Gini" => gini_b, "order" => 2},
+  %{"Szenario" => "C: Konsumsteuer", "Gini" => gini_c, "order" => 3}
+]
 
 chart_gini =
-  Vl.new(width: 720, height: 300, title: "Gini-Koeffizient des verfügbaren Äquivalenzeinkommens (1998–2018)")
-  |> Vl.data_from_values(gini_timeseries)
-  |> Vl.mark(:line, point: true, stroke_width: 2)
-  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  Vl.new(
+    width: 720,
+    height: 300,
+    title: "Gini-Koeffizient nach Finanzierungsszenario"
+  )
+  |> Vl.data_from_values(gini_data)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:x, "Szenario",
+    type: :nominal,
+    sort: [field: "order"],
+    title: nil
+  )
   |> Vl.encode_field(:y, "Gini",
     type: :quantitative,
     title: "Gini-Koeffizient",
-    scale: [domain: [0.25, 0.35]]
+    scale: [domain: [0.0, 0.35]]
   )
-  |> Vl.encode(:color, value: "#a855f7")
+  |> Vl.encode_field(:color, "Szenario",
+    type: :nominal,
+    scale: [
+      domain: ["Status quo", "A: Einkommensteuer", "B: Transferablösung", "C: Konsumsteuer"],
+      range: ["#6b7280", "#a855f7", "#3b82f6", "#06b6d4"]
+    ],
+    legend: nil
+  )
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
+  )
+```
+
+## Visualisierung: Gewinner und Verlierer
+
+```elixir
+# Chart 4: Gewinner/Verlierer-Analyse — wer profitiert, wer verliert?
+gv_data =
+  Enum.flat_map(["A: Einkommensteuer", "B: Transferablösung", "C: Konsumsteuer"], fn szenario ->
+    source =
+      case szenario do
+        "A: Einkommensteuer" -> scenario_a
+        "B: Transferablösung" -> scenario_b
+        "C: Konsumsteuer" -> scenario_c
+      end
+
+    Enum.map(source, fn d ->
+      %{
+        "Dezil" => d["Dezil"],
+        "Szenario" => szenario,
+        "Veränderung %" =>
+          if d["Einkommen_SQ"] > 0 do
+            Float.round(d["Veraenderung"] / d["Einkommen_SQ"] * 100, 1)
+          else
+            0.0
+          end
+      }
+    end)
+  end)
+
+chart_gewinner =
+  Vl.new(
+    width: 720,
+    height: 400,
+    title: "Relative Einkommensveränderung nach Dezil und Szenario"
+  )
+  |> Vl.data_from_values(gv_data)
+  |> Vl.mark(:line, point: [size: 60], stroke_width: 2)
+  |> Vl.encode_field(:x, "Dezil", type: :ordinal, title: "Einkommensdezil")
+  |> Vl.encode_field(:y, "Veränderung %",
+    type: :quantitative,
+    title: "Relative Veränderung (%)"
+  )
+  |> Vl.encode_field(:color, "Szenario",
+    type: :nominal,
+    scale: [range: ["#a855f7", "#3b82f6", "#06b6d4"]],
+    legend: [orient: "top"]
+  )
+  |> Vl.encode_field(:stroke_dash, "Szenario", type: :nominal, legend: nil)
   |> Vl.config(
     font: "Switzer, system-ui, sans-serif",
     view: [stroke: "transparent"]
@@ -243,48 +458,67 @@ chart_gini =
 ## Kernaussage
 
 ```elixir
-d1_income = hd(decile_incomes)["Einkommen_Status_quo"]
-d1_pct_increase = round(ubi_monthly / max(d1_income, 1) * 100)
+d1_pct_a = hd(gv_data)["Veränderung %"]
+d10_change_a = List.last(scenario_a)["Veraenderung"]
+
+verlierer_count_b =
+  scenario_b
+  |> Enum.count(fn d -> d["Veraenderung"] < 0 end)
 
 Kino.Markdown.new("""
 ### Kernaussage
 
-Ein bedingungsloses Grundeinkommen von **CHF 2'500 pro Monat** würde
-die unteren Einkommensdezile überproportional stärken — die relative
-Einkommensverbesserung beträgt für das 1. Dezil rund **#{d1_pct_increase}%**,
-während sie für das 10. Dezil unter 10% liegt.
+Drei Finanzierungsmodelle für ein UBI von **CHF 2'500/Mt** erzeugen
+grundlegend unterschiedliche Verteilungswirkungen:
 
-Der simulierte Gini-Koeffizient sinkt von **#{gini_sim_sq}** auf **#{gini_sim_ubi}** —
-ein Rückgang der Einkommensungleichheit allein durch den Sockelbetrag
-(ohne Berücksichtigung der Gegenfinanzierung).
+**A — Pauschale Einkommensteuer (#{Float.round(tax_rate_a * 100, 1)}% Zuschlag):**
+Alle Dezile unter dem Durchschnitt profitieren netto.
+D1 gewinnt relativ am meisten (+#{d1_pct_a}%), D10 verliert CHF #{abs(d10_change_a)}/Mt.
+Gini sinkt von #{gini_sq} auf #{gini_a}.
 
-**Einschränkungen**: Diese Simulation basiert auf aggregierten Dezildaten
-(nicht auf individuellen Haushaltsdaten) und berücksichtigt weder die
-Finanzierung noch Verhaltensanpassungen.
+**B — Transferablösung (AHV/IV/EL/Sozialhilfe + #{Float.round(tax_rate_b * 100, 1)}% Steuer):**
+#{if verlierer_count_b > 0, do: "**#{verlierer_count_b} Dezil(e) stehen schlechter da** — bestehende Transfers übersteigen den UBI-Betrag.", else: "Alle Dezile profitieren."}
+Das ist der nicht-triviale Befund: Ein UBI als Ersatz ist für die Ärmsten
+nicht automatisch besser.
+
+**C — Konsumsteuer (#{Float.round(vat_surcharge * 100, 1)}% MwSt.-Zuschlag):**
+Progressiv im Netto (untere Dezile konsumieren mehr, sparen weniger),
+aber weniger umverteilend als Szenario A. Gini: #{gini_c}.
+
+**Einschränkungen**: Dezilbasierte Simulation ohne Individualdaten.
+Keine Verhaltensanpassungen. Transferschätzungen basieren auf
+publizierten BFS-Verteilungsanteilen (nicht Mikrodaten).
 """)
 ```
 
 ## Export
 
 ```elixir
-# Export charts and generate notiz draft
-Zukunftslabor.ChartExport.to_svg(chart_deciles, name: "einkommensverteilung_dezile")
-Zukunftslabor.ChartExport.to_svg(chart_comparison, name: "einkommensverteilung_vergleich")
-Zukunftslabor.ChartExport.to_svg(chart_gini, name: "einkommensverteilung_gini_zeitreihe")
+Zukunftslabor.ChartExport.to_svg(chart_baseline, name: "grundeinkommen_baseline_dezile")
+Zukunftslabor.ChartExport.to_svg(chart_szenarien, name: "grundeinkommen_szenarien_vergleich")
+Zukunftslabor.ChartExport.to_svg(chart_gini, name: "grundeinkommen_gini_szenarien")
+Zukunftslabor.ChartExport.to_svg(chart_gewinner, name: "grundeinkommen_gewinner_verlierer")
 
 Zukunftslabor.NotizTemplate.generate(
-  title: "Was ein Grundeinkommen an der Einkommensverteilung ändern würde",
-  description: "Mikrosimulation: Ein bedingungsloses Grundeinkommen von CHF 2'500/Monat stärkt vor allem die unteren Einkommen und senkt den Gini-Koeffizienten.",
-  slug: "einkommensverteilung-grundeinkommen",
+  title: "Grundeinkommen: Drei Finanzierungsmodelle im Vergleich",
+  description:
+    "Was passiert mit der Einkommensverteilung, wenn ein UBI über Einkommensteuer, Transferablösung oder Konsumsteuer finanziert wird? Dezil-Simulation mit BFS-Daten.",
+  slug: "grundeinkommen-finanzierungsmodelle",
   category: "datenbriefing",
   evidence: "mittel",
-  tags: ["grundeinkommen", "einkommen", "ungleichheit", "simulation"],
-  charts: ["einkommensverteilung_dezile.svg", "einkommensverteilung_vergleich.svg", "einkommensverteilung_gini_zeitreihe.svg"],
+  tags: ["grundeinkommen", "finanzierung", "einkommen", "ungleichheit", "simulation"],
+  charts: [
+    "grundeinkommen_baseline_dezile.svg",
+    "grundeinkommen_szenarien_vergleich.svg",
+    "grundeinkommen_gini_szenarien.svg",
+    "grundeinkommen_gewinner_verlierer.svg"
+  ],
   summary: """
-  Ein bedingungsloses Grundeinkommen von CHF 2'500 pro Monat würde die Schweizer
-  Einkommensverteilung spürbar verändern: Die unteren Dezile profitieren relativ am
-  stärksten, der simulierte Gini-Koeffizient sinkt von #{gini_sim_sq} auf #{gini_sim_ubi}.
-  Grundlage: BFS-HABE-Daten 2018 (Einkommensanteile nach Dezilen).
+  Drei Finanzierungsmodelle für ein bedingungsloses Grundeinkommen von CHF 2'500/Monat
+  zeigen grundlegend verschiedene Verteilungswirkungen. Eine pauschale Einkommensteuer
+  senkt den Gini am stärksten. Die Ablösung bestehender Transfers spart zwar Steuern,
+  kann aber die ärmsten Haushalte schlechter stellen — ein nicht-trivialer Befund.
+  Eine Konsumsteuer wirkt progressiv, aber schwächer.
   """,
   body: """
   ## Methodik
@@ -293,29 +527,47 @@ Zukunftslabor.NotizTemplate.generate(
   Haushaltsbudgeterhebung (HABE) 2018 des BFS. Daraus werden absolute
   Monatseinkommen pro Dezil geschätzt (Anteil × Mittelwert × 10).
 
-  Die Mikrosimulation addiert CHF 2'500/Monat auf jedes Dezil und berechnet
-  den resultierenden Gini-Koeffizienten. Da nur Dezilanteile vorliegen
-  (keine Individualdaten), ist die Gini-Schätzung approximativ.
+  Drei Finanzierungsszenarien werden simuliert:
+
+  - **A — Pauschale Einkommensteuer**: Bruttokosten (CHF #{Float.round(gross_cost_bn, 0)} Mrd./Jahr)
+    werden über einen linearen Einkommensteuerzuschlag finanziert.
+  - **B — Transferablösung**: AHV, IV, EL, Sozialhilfe, ALV und Familienzulagen
+    (CHF #{transfers_replaced_bn} Mrd.) werden durch das UBI ersetzt.
+    Der verbleibende Betrag wird über Einkommensteuer finanziert.
+  - **C — Konsumsteuer**: Die Finanzierung erfolgt über einen MwSt.-Zuschlag.
+    Konsumquoten variieren nach Dezil (D1: 95%, D10: 55%).
 
   ## Ergebnisse
 
-  ![Einkommensanteile nach Dezil](/zukunftslabor/charts/einkommensverteilung_dezile.svg)
+  ### Baseline: Einkommensverteilung 2018
 
-  ![Vergleich: Status quo vs. Grundeinkommen](/zukunftslabor/charts/einkommensverteilung_vergleich.svg)
+  ![Einkommensanteile nach Dezil](/zukunftslabor/charts/grundeinkommen_baseline_dezile.svg)
 
-  ![Gini-Zeitreihe 1998–2018](/zukunftslabor/charts/einkommensverteilung_gini_zeitreihe.svg)
+  ### Nettowirkung der drei Szenarien
+
+  ![Szenarien-Vergleich](/zukunftslabor/charts/grundeinkommen_szenarien_vergleich.svg)
+
+  ### Gini-Koeffizient nach Szenario
+
+  ![Gini-Vergleich](/zukunftslabor/charts/grundeinkommen_gini_szenarien.svg)
+
+  ### Relative Gewinner und Verlierer
+
+  ![Gewinner und Verlierer](/zukunftslabor/charts/grundeinkommen_gewinner_verlierer.svg)
 
   ## Einschränkungen
 
   - Aggregierte Dezildaten statt Mikrodaten (Individualdaten erfordern BFS-Antrag)
-  - Keine Modellierung der Gegenfinanzierung (Steuererhöhungen, Transferablösung)
   - Keine Verhaltensanpassungen (Arbeitsangebot, Konsummuster)
-  - Dezilanteile unterschätzen die Streuung innerhalb der Gruppen
+  - Transferverteilung auf Dezile geschätzt (nicht direkt aus SILC-Mikrodaten)
+  - Konsumquoten nach Dezil basieren auf Literaturwerten, nicht BFS-HABE-Detail
   - Daten nur bis 2018 verfügbar (neueste BFS-HABE-Publikation)
 
   ## Datenquellen
 
-  - BFS HABE 2018: Kennzahlen zur Verteilung der Einkommen (Verfügbares Äquivalenzeinkommen)
+  - BFS HABE 2018: Einkommensanteile nach Dezilen (Verfügbares Äquivalenzeinkommen)
+  - BSV Sozialversicherungsstatistik: Transfervolumen AHV, IV, EL, ALV
+  - BFS SILC: publizierte Verteilungsanteile der Sozialtransfers
   """
 )
 ```

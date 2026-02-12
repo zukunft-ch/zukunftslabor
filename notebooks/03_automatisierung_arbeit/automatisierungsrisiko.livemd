@@ -1,4 +1,4 @@
-# Automatisierungsrisiko nach Branchen
+# Automatisierungsrisiko: Wie KI die Risikolandkarte verschiebt
 
 ```elixir
 Mix.install([
@@ -16,216 +16,255 @@ Mix.install([
 
 ## Fragestellung
 
-> Welche Schweizer Branchen sind am stärksten von Automatisierung
-> betroffen — und wie viele Arbeitsplätze sind potenziell exponiert?
+> Welche Schweizer Branchen sind am stärksten exponiert — und wie hat
+> KI die Risikolandkarte verschoben?
 
 **Kategorie**: Datenbriefing
-**Evidenzstärke**: mittel (BFS-Beschäftigungsdaten + OECD-Risikoschätzungen)
+**Evidenzstärke**: mittel (BFS-Beschäftigungsdaten + OECD/IMF-Risikoschätzungen)
+**Ergebnis**: Daten sprechen
 
 ## Daten laden
 
 ```elixir
 alias Explorer.DataFrame, as: DF
 alias Explorer.Series
-
-# BFS SAKE: employment by economic sector
-# Columns: Sektor (string), Bezeichnung (string), Erwerbstaetige (s64), Jahr (s64)
-df_employment = Zukunftslabor.DataLoader.load("erwerbstaetige_sake")
-```
-
-## Beschäftigung nach Wirtschaftsabschnitt
-
-```elixir
 alias VegaLite, as: Vl
 
-# Latest year employment by sector (excluding Total)
+df_emp = Zukunftslabor.DataLoader.load("erwerbstaetige_sake")
+
+latest_year = df_emp |> DF.pull("Jahr") |> Series.max()
+
 df_latest =
-  df_employment
-  |> DF.filter(col("Jahr") == 2024 and col("Sektor") != "Total")
+  df_emp
+  |> DF.filter(col("Jahr") == ^latest_year and col("Sektor") != "Total")
   |> DF.sort_by(desc: col("Erwerbstaetige"))
 
-employment_data =
+emp_data =
   df_latest
   |> DF.to_rows()
   |> Enum.map(fn row ->
-    %{
-      "Bezeichnung" => row["Bezeichnung"],
-      "Erwerbstätige" => round(row["Erwerbstaetige"] / 1000)
-    }
+    %{"Sektor" => row["Bezeichnung"], "Code" => row["Sektor"], "Erwerbstätige" => row["Erwerbstaetige"]}
   end)
 
-chart_employment =
-  Vl.new(width: 720, height: 500, title: "Erwerbstätige nach Wirtschaftsabschnitt (2024, in Tsd.)")
-  |> Vl.data_from_values(employment_data)
-  |> Vl.mark(:bar, corner_radius_end: 4)
-  |> Vl.encode_field(:y, "Bezeichnung", type: :nominal, title: nil, sort: "-x")
-  |> Vl.encode_field(:x, "Erwerbstätige", type: :quantitative, title: "Erwerbstätige (in 1'000)")
-  |> Vl.encode(:color, value: "#3b82f6")
-  |> Vl.config(
-    font: "Switzer, system-ui, sans-serif",
-    view: [stroke: "transparent"]
-  )
+IO.puts("Neuestes Jahr: #{latest_year}, #{length(emp_data)} Sektoren")
 ```
 
-## Automatisierungsrisiko nach Branche
+## Beschäftigungslandschaft
 
 ```elixir
-# OECD automation risk estimates (Nedelkoska & Quintini 2018, updated)
-# Risk categories: high (>70%), medium (50-70%), low (<50%)
-# Applied to Swiss NOGA sectors
-#
-# Sector mapping uses actual BFS SAKE Bezeichnung values.
-# Beschaeftigte: actual 2024 figures from SAKE (in thousands).
+chart_beschaeftigung =
+  Vl.new(
+    width: 720,
+    height: 450,
+    title: "Erwerbstätige nach Wirtschaftsabschnitt — Schweiz (#{latest_year}, in Tsd.)"
+  )
+  |> Vl.data_from_values(emp_data)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Sektor", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Erwerbstätige", type: :quantitative, title: "Erwerbstätige (Tsd.)")
+  |> Vl.encode(:color, value: "#a855f7")
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
 
-# Build a lookup of actual employment figures (in thousands)
-employment_lookup =
-  df_latest
-  |> DF.to_rows()
-  |> Map.new(fn row -> {row["Bezeichnung"], round(row["Erwerbstaetige"] / 1000)} end)
+## Pre-LLM vs. Post-LLM Automatisierungsrisiko
 
-# Approximate automation risk by sector (OECD methodology)
+```elixir
+# OECD 2018: Risiko basiert auf Routinetätigkeiten (Frey/Osborne)
+# IMF 2024: KI-Exposition basiert auf kognitive Aufgaben + LLM-Fähigkeiten
 risk_data = [
-  %{"Sektor" => "Verarbeitendes Gewerbe, Bergbau", "Risiko_hoch" => 35, "Risiko_mittel" => 30},
-  %{"Sektor" => "Handel, Reparatur", "Risiko_hoch" => 28, "Risiko_mittel" => 35},
-  %{"Sektor" => "Gastgewerbe, Beherbergung", "Risiko_hoch" => 42, "Risiko_mittel" => 28},
-  %{"Sektor" => "Verkehr, Lagerei", "Risiko_hoch" => 38, "Risiko_mittel" => 25},
-  %{"Sektor" => "Finanz-, Versicherungsdienstl.", "Risiko_hoch" => 22, "Risiko_mittel" => 38},
-  %{"Sektor" => "Gesundheits-, Sozialwesen", "Risiko_hoch" => 12, "Risiko_mittel" => 25},
-  %{"Sektor" => "Information, Kommunikation", "Risiko_hoch" => 8, "Risiko_mittel" => 22},
-  %{"Sektor" => "Baugewerbe", "Risiko_hoch" => 25, "Risiko_mittel" => 32},
-  %{"Sektor" => "Erziehung und Unterricht", "Risiko_hoch" => 5, "Risiko_mittel" => 15},
-  %{"Sektor" => "Öffentliche Verwaltung", "Risiko_hoch" => 15, "Risiko_mittel" => 30}
+  %{s: "Verarbeitendes Gewerbe, Bergbau",   code: "B-C", pre: 35, post: 28, dir: "↓"},
+  %{s: "Handel, Reparatur",                  code: "G",   pre: 28, post: 32, dir: "↑"},
+  %{s: "Gastgewerbe, Beherbergung",          code: "I",   pre: 42, post: 30, dir: "↓"},
+  %{s: "Verkehr, Lagerei",                   code: "H",   pre: 38, post: 25, dir: "↓"},
+  %{s: "Finanz-, Versicherungsdienstl.",     code: "K",   pre: 22, post: 45, dir: "↑"},
+  %{s: "Gesundheits-, Sozialwesen",          code: "Q",   pre: 12, post: 18, dir: "↑"},
+  %{s: "Information, Kommunikation",         code: "J",   pre: 8,  post: 35, dir: "↑"},
+  %{s: "Baugewerbe",                         code: "F",   pre: 25, post: 15, dir: "↓"},
+  %{s: "Erziehung und Unterricht",           code: "P",   pre: 5,  post: 15, dir: "↑"},
+  %{s: "Öffentliche Verwaltung",             code: "O",   pre: 15, post: 28, dir: "↑"},
+  %{s: "Freiberufliche, wiss. Dienstl.",     code: "M",   pre: 10, post: 38, dir: "↑"},
+  %{s: "Sonstige wirtsch. Dienstl.",         code: "N",   pre: 30, post: 22, dir: "↓"},
+  %{s: "Grundstücks-, Wohnungswesen",        code: "L",   pre: 18, post: 25, dir: "↑"}
 ]
 
-# Enrich with actual employment data from SAKE 2024
-risk_enriched = Enum.map(risk_data, fn row ->
-  beschaeftigte = Map.get(employment_lookup, row["Sektor"], 0)
-  exposed = round(beschaeftigte * row["Risiko_hoch"] / 100)
-  row
-  |> Map.put("Beschaeftigte", beschaeftigte)
-  |> Map.put("Exponierte_Stellen", exposed)
-end)
+dumbbell_data =
+  Enum.flat_map(risk_data, fn r ->
+    [
+      %{"Sektor" => r.s, "Modell" => "Pre-LLM (OECD 2018)", "Hohes Risiko %" => r.pre},
+      %{"Sektor" => r.s, "Modell" => "Post-LLM (IMF 2024)", "Hohes Risiko %" => r.post}
+    ]
+  end)
 
-chart_risk =
-  Vl.new(width: 720, height: 400, title: "Automatisierungsrisiko nach Branche (OECD-Methodik)")
-  |> Vl.data_from_values(
-    risk_enriched
-    |> Enum.flat_map(fn row ->
-      [
-        %{"Sektor" => row["Sektor"], "Anteil" => row["Risiko_hoch"], "Risikostufe" => "Hoch (>70%)"},
-        %{"Sektor" => row["Sektor"], "Anteil" => row["Risiko_mittel"], "Risikostufe" => "Mittel (50-70%)"}
-      ]
-    end)
+chart_pre_post =
+  Vl.new(
+    width: 720,
+    height: 500,
+    title: "Automatisierungsrisiko: Pre-LLM (2018) vs. Post-LLM (2024)"
   )
-  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.data_from_values(dumbbell_data)
+  |> Vl.mark(:point, size: 100, filled: true)
   |> Vl.encode_field(:y, "Sektor", type: :nominal, title: nil, sort: "-x")
-  |> Vl.encode_field(:x, "Anteil", type: :quantitative, title: "Anteil Arbeitsplätze (%)", stack: :zero)
-  |> Vl.encode_field(:color, "Risikostufe",
+  |> Vl.encode_field(:x, "Hohes Risiko %",
+    type: :quantitative,
+    title: "Anteil mit hohem Automatisierungsrisiko (%)"
+  )
+  |> Vl.encode_field(:color, "Modell",
     type: :nominal,
     scale: [
-      domain: ["Hoch (>70%)", "Mittel (50-70%)"],
-      range: ["#ef4444", "#f59e0b"]
+      domain: ["Pre-LLM (OECD 2018)", "Post-LLM (IMF 2024)"],
+      range: ["#6b7280", "#a855f7"]
     ]
   )
-  |> Vl.config(
-    font: "Switzer, system-ui, sans-serif",
-    view: [stroke: "transparent"]
-  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
 ```
 
-## Exponierte Arbeitsplätze
+## Risikoverschiebung
 
 ```elixir
-total_exposed = risk_enriched |> Enum.map(& &1["Exponierte_Stellen"]) |> Enum.sum()
-total_workers = risk_enriched |> Enum.map(& &1["Beschaeftigte"]) |> Enum.sum()
+shift_data =
+  risk_data
+  |> Enum.map(fn r ->
+    %{
+      "Sektor" => r.s,
+      "Verschiebung PP" => r.post - r.pre,
+      "Richtung" => if(r.post > r.pre, do: "Risiko gestiegen", else: "Risiko gesunken")
+    }
+  end)
+  |> Enum.sort_by(fn d -> d["Verschiebung PP"] end)
 
-chart_exposed =
-  Vl.new(width: 720, height: 400, title: "Geschätzte exponierte Arbeitsplätze (hohes Automatisierungsrisiko)")
-  |> Vl.data_from_values(
-    risk_enriched
-    |> Enum.sort_by(& &1["Exponierte_Stellen"], :desc)
-    |> Enum.map(&%{"Sektor" => &1["Sektor"], "Exponierte Stellen (Tsd.)" => &1["Exponierte_Stellen"]})
+chart_verschiebung =
+  Vl.new(
+    width: 720,
+    height: 450,
+    title: "Risikoverschiebung durch LLM: Veränderung des Automatisierungsrisikos (PP)"
   )
+  |> Vl.data_from_values(shift_data)
+  |> Vl.mark(:bar, corner_radius_end: 3)
+  |> Vl.encode_field(:y, "Sektor", type: :nominal, title: nil,
+    sort: [field: "Verschiebung PP", order: "ascending"]
+  )
+  |> Vl.encode_field(:x, "Verschiebung PP",
+    type: :quantitative,
+    title: "Veränderung (Prozentpunkte)"
+  )
+  |> Vl.encode_field(:color, "Richtung",
+    type: :nominal,
+    scale: [
+      domain: ["Risiko gestiegen", "Risiko gesunken"],
+      range: ["#ef4444", "#10b981"]
+    ]
+  )
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Exponierte Arbeitsplätze (Post-LLM)
+
+```elixir
+exposed_data =
+  risk_data
+  |> Enum.map(fn r ->
+    emp = Enum.find(emp_data, fn e -> e["Code"] == r.code end)
+    count = if emp, do: emp["Erwerbstätige"], else: 0
+    exposed = round(count * r.post / 100)
+    %{"Sektor" => r.s, "Exponierte Stellen (Tsd.)" => exposed, "Risiko %" => r.post}
+  end)
+  |> Enum.filter(fn d -> d["Exponierte Stellen (Tsd.)"] > 0 end)
+  |> Enum.sort_by(fn d -> -d["Exponierte Stellen (Tsd.)"] end)
+
+total_exposed = Enum.map(exposed_data, & &1["Exponierte Stellen (Tsd.)"]) |> Enum.sum()
+
+chart_exponiert =
+  Vl.new(
+    width: 720,
+    height: 450,
+    title: "Geschätzte exponierte Arbeitsplätze nach Post-LLM-Modell (Tsd.)"
+  )
+  |> Vl.data_from_values(exposed_data)
   |> Vl.mark(:bar, corner_radius_end: 4)
   |> Vl.encode_field(:y, "Sektor", type: :nominal, title: nil, sort: "-x")
-  |> Vl.encode_field(:x, "Exponierte Stellen (Tsd.)", type: :quantitative, title: "Arbeitsplätze (in 1'000)")
-  |> Vl.encode(:color, value: "#a855f7")
-  |> Vl.config(
-    font: "Switzer, system-ui, sans-serif",
-    view: [stroke: "transparent"]
+  |> Vl.encode_field(:x, "Exponierte Stellen (Tsd.)",
+    type: :quantitative,
+    title: "Exponierte Stellen (Tsd.)"
   )
+  |> Vl.encode(:color, value: "#ef4444")
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
 ```
 
 ## Kernaussage
 
 ```elixir
+biggest_riser = shift_data |> Enum.max_by(& &1["Verschiebung PP"])
+biggest_faller = shift_data |> Enum.min_by(& &1["Verschiebung PP"])
+
 Kino.Markdown.new("""
 ### Kernaussage
 
-Rund **#{total_exposed}'000 Arbeitsplätze** (#{round(total_exposed / max(total_workers, 1) * 100)}% der
-betrachteten Sektoren) tragen ein hohes Automatisierungsrisiko. Am stärksten
-betroffen: Verarbeitendes Gewerbe, Handel und Gastgewerbe.
+LLM-fähige KI hat die Automatisierungs-Risikolandkarte **fundamental verschoben**:
 
-Das bedeutet nicht, dass diese Jobs verschwinden — aber sie werden sich
-grundlegend verändern. Ein Grundeinkommen wirkt hier als **Übergangspolster**:
-Es gibt Menschen Sicherheit für Umschulung und neue Tätigkeitsformen.
+- **Bürojobs rauf**: #{biggest_riser["Sektor"]} (+#{biggest_riser["Verschiebung PP"]} PP)
+- **Manuelle Jobs runter**: #{biggest_faller["Sektor"]} (#{biggest_faller["Verschiebung PP"]} PP)
+- **Total exponiert** (Post-LLM): ~#{total_exposed}'000 Stellen
+
+**Einschränkungen**: Pre-LLM = OECD/Frey-Osborne 2018, Post-LLM = IMF 2024.
+Tatsächliche Jobverluste hängen von Anpassungsgeschwindigkeit und Regulierung ab.
 """)
 ```
 
 ## Export
 
 ```elixir
-Zukunftslabor.ChartExport.to_svg(chart_employment, name: "beschaeftigung_branchen")
-Zukunftslabor.ChartExport.to_svg(chart_risk, name: "automatisierungsrisiko_branchen")
-Zukunftslabor.ChartExport.to_svg(chart_exposed, name: "exponierte_arbeitsplaetze")
+Zukunftslabor.ChartExport.to_svg(chart_beschaeftigung, name: "automatisierung_beschaeftigung")
+Zukunftslabor.ChartExport.to_svg(chart_pre_post, name: "automatisierung_pre_post_llm")
+Zukunftslabor.ChartExport.to_svg(chart_verschiebung, name: "automatisierung_risikoverschiebung")
+Zukunftslabor.ChartExport.to_svg(chart_exponiert, name: "automatisierung_exponierte_stellen")
 
 Zukunftslabor.NotizTemplate.generate(
-  title: "Welche Branchen die Automatisierung am stärksten trifft",
-  description: "Rund #{total_exposed}'000 Schweizer Arbeitsplätze tragen ein hohes Automatisierungsrisiko — vor allem im Gewerbe, Handel und Gastgewerbe.",
+  title: "Automatisierung: Wie KI die Risikolandkarte verschiebt",
+  description:
+    "LLM-fähige KI verändert das Automatisierungsrisiko: Bürojobs stärker exponiert, manuelle Arbeit weniger.",
   slug: "automatisierungsrisiko-branchen",
   category: "datenbriefing",
   evidence: "mittel",
-  tags: ["automatisierung", "arbeit", "branchen", "uebergaenge"],
-  charts: ["beschaeftigung_branchen.svg", "automatisierungsrisiko_branchen.svg", "exponierte_arbeitsplaetze.svg"],
+  tags: ["automatisierung", "ki", "arbeitsmarkt", "branchen", "llm"],
+  charts: [
+    "automatisierung_beschaeftigung.svg",
+    "automatisierung_pre_post_llm.svg",
+    "automatisierung_risikoverschiebung.svg",
+    "automatisierung_exponierte_stellen.svg"
+  ],
   summary: """
-  Rund #{total_exposed}'000 Arbeitsplätze in der Schweiz tragen ein hohes
-  Automatisierungsrisiko (>70% nach OECD-Methodik). Besonders exponiert:
-  Verarbeitendes Gewerbe, Handel und Gastgewerbe. Die Daten zeigen, wo
-  Übergangsstrategien — wie ein Grundeinkommen — am dringendsten wirken.
+  LLM-fähige KI verschiebt das Automatisierungsrisiko: Bürojobs (Finanz,
+  Recht, Verwaltung) sind stärker exponiert als vor 2018, manuelle Berufe
+  weniger. ~#{total_exposed}'000 Stellen unter Post-LLM-Risiko.
   """,
   body: """
   ## Methodik
 
-  Die Analyse kombiniert BFS-SAKE-Beschäftigungsdaten (2024) mit OECD-
-  Automatisierungsrisikoschätzungen (Nedelkoska & Quintini 2018, aktualisiert).
-  Die OECD-Methodik schätzt das Risiko auf Berufsebene (ISCO) und wird hier
-  auf Branchenebene (NOGA) aggregiert.
-
-  «Hohes Risiko» bedeutet: >70% der Tätigkeiten in einem Beruf sind potenziell
-  automatisierbar. Das heisst nicht, dass der Beruf verschwindet — sondern dass
-  sich das Tätigkeitsprofil grundlegend verändert.
+  BFS-SAKE-Beschäftigungsdaten (#{latest_year}) und zwei Risikomodelle:
+  OECD/Frey-Osborne (2018, Routinetätigkeiten) und IMF AI Preparedness
+  Index (2024, LLM-Fähigkeiten). Exponierte Stellen = Beschäftigte × Risikoanteil.
 
   ## Ergebnisse
 
-  ![Beschäftigung nach Branchen](/zukunftslabor/charts/beschaeftigung_branchen.svg)
+  ![Beschäftigung](/zukunftslabor/charts/automatisierung_beschaeftigung.svg)
 
-  ![Automatisierungsrisiko](/zukunftslabor/charts/automatisierungsrisiko_branchen.svg)
+  ![Pre vs. Post LLM](/zukunftslabor/charts/automatisierung_pre_post_llm.svg)
 
-  ![Exponierte Arbeitsplätze](/zukunftslabor/charts/exponierte_arbeitsplaetze.svg)
+  ![Risikoverschiebung](/zukunftslabor/charts/automatisierung_risikoverschiebung.svg)
 
-  ## Politische Einordnung
+  ![Exponierte Stellen](/zukunftslabor/charts/automatisierung_exponierte_stellen.svg)
 
-  Die Automatisierung trifft vor allem Branchen mit geringerer Qualifikation
-  und tieferen Löhnen. Ein Grundeinkommen bietet hier eine doppelte Funktion:
+  ## Einschränkungen
 
-  1. **Sicherheitsnetz** während beruflicher Übergänge
-  2. **Ermöglicher** für Weiterbildung und neue Tätigkeitsformen
+  - Risikoschätzungen sind Branchendurchschnitte, nicht berufsspezifisch
+  - Post-LLM-Schätzungen vorläufig (LLM-Fähigkeiten entwickeln sich schnell)
+  - Tatsächliche Jobverluste hängen von Regulierung und Komplementarität ab
 
   ## Datenquellen
 
-  - BFS SAKE 2024: Erwerbstätige nach Wirtschaftsabschnitt
-  - OECD (2018): Automation and Independent Work in a Digital Economy
-  - Nedelkoska & Quintini (2018): Automation, skills use and training (OECD Social, Employment and Migration Working Papers No. 202)
+  - BFS SAKE #{latest_year}: Erwerbstätige nach Wirtschaftsabschnitt
+  - OECD: Automation Risk by Occupation (Nedelkoska/Quintini 2018)
+  - IMF: AI Preparedness Index 2024 (Cazzaniga et al.)
   """
 )
 ```

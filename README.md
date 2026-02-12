@@ -61,6 +61,23 @@ All tasks are defined in `mise.toml` and run via `mise run <task>`.
 | `publish` | Copy `output/` to `die-zukunft.ch` repo |
 | `test` | Run Elixir tests (`mix test`) |
 
+## Notebooks
+
+10 notebooks covering Swiss policy topics. Each produces 4 charts + a publication-ready draft.
+
+| # | Directory | Topic | Conclusion style |
+|---|-----------|-------|-----------------|
+| 01 | `01_grundeinkommen` | UBI financing models — 3 scenarios compared | Data speaks |
+| 02 | `02_digitale_souveraenitaet` | Digital readiness gap (citizens vs. state) | Light framing |
+| 03 | `03_automatisierung_arbeit` | Pre-LLM vs. Post-LLM automation risk | Data speaks |
+| 04 | `04_wohnen_ungleichheit` | Cantonal rent burden — when does each cross 30%? | Data speaks |
+| 05 | `05_forschung_innovation` | R&D spending — who performs, who pays? | Light framing |
+| 06 | `06_energie_resilienz` | Electricity stress scenarios (drought + nuclear exit) | Data speaks |
+| 07 | `07_uebergaenge_weiterbildung` | Training participation vs. automation exposure | Light framing |
+| 08 | `08_life_science_gesundheit` | Health spending — admin cost waste | Data speaks |
+| 10 | `10_talent_migration` | Immigrant overqualification as value loss | Data speaks |
+| 12 | `12_neutralitaet_verteidigung` | Defense spending vs. public priorities | Light framing |
+
 ## Data sources
 
 Datasets are defined in [`data/registry.toml`](data/registry.toml). Currently registered:
@@ -68,9 +85,17 @@ Datasets are defined in [`data/registry.toml`](data/registry.toml). Currently re
 | Dataset | Source | Topic |
 |---------|--------|-------|
 | `einkommensverteilung_silc` | BFS DAM | Income distribution, Gini, deciles |
-| `ikt_egov` | BFS PxWeb | E-government usage 2014-2025 |
+| `ikt_egov` | BFS PxWeb | E-government usage |
+| `ikt_internetnutzung` | BFS PxWeb | Internet usage by age |
 | `erwerbstaetige_sake` | BFS DAM | Employment by sector (SAKE) |
 | `mietzinse_kantone` | BFS DAM | Rent prices by canton and room count |
+| `forschung_ausgaben` | BFS DAM | R&D expenditure by sector |
+| `elektrizitaet_produktion` | BFE OGD | Electricity production by source |
+| `energieverbrauch_sektor` | BFE OGD | Energy consumption by sector |
+| `gesundheitsausgaben` | BFS DAM | Health expenditure by category |
+| `auslaender_aufenthalt` | BFS PxWeb | Foreign population by permit type |
+| `wanderungen` | BFS PxWeb | International migration flows |
+| `verteidigungsausgaben` | World Bank | Military expenditure (% GDP) |
 
 See [docs/data-sources.md](docs/data-sources.md) for how to add new datasets.
 
@@ -88,16 +113,22 @@ zukunftslabor/
 │       ├── chart_export.ex   # VegaLite → SVG/PNG export
 │       └── notiz_template.ex # generate markdown drafts with TOML frontmatter
 ├── notebooks/
-│   ├── 01_grundeinkommen/    # income distribution + UBI simulation
-│   ├── 02_digitale_souveraenitaet/  # e-gov usage + e-ID
-│   ├── 03_automatisierung_arbeit/   # automation risk by sector
-│   └── 04_wohnen_ungleichheit/      # rent burden by income group
+│   ├── 01_grundeinkommen/
+│   ├── 02_digitale_souveraenitaet/
+│   ├── 03_automatisierung_arbeit/
+│   ├── 04_wohnen_ungleichheit/
+│   ├── 05_forschung_innovation/
+│   ├── 06_energie_resilienz/
+│   ├── 07_uebergaenge_weiterbildung/
+│   ├── 08_life_science_gesundheit/
+│   ├── 10_talent_migration/
+│   └── 12_neutralitaet_verteidigung/
 ├── output/
 │   ├── charts/               # exported SVG charts (gitignored)
 │   └── drafts/               # generated markdown drafts (gitignored)
 ├── scripts/
 │   ├── common.py             # HTTP caching + BFS API utilities
-│   ├── fetch_bfs.py          # main data fetcher (BFS PxWeb + DAM)
+│   ├── fetch_bfs.py          # main data fetcher (BFS PxWeb + DAM + URL)
 │   ├── fetch_oecd.py         # OECD SDMX fetcher
 │   └── run_all_notebooks.exs # batch-run all notebooks
 ├── test/                     # Elixir tests
@@ -107,7 +138,7 @@ zukunftslabor/
 
 ## Adding a new analysis
 
-1. Create a directory: `notebooks/05_your_topic/`
+1. Create a directory: `notebooks/NN_your_topic/`
 2. Register datasets in `data/registry.toml` and run `mise run fetch`
 3. Create a `.livemd` notebook following the [notebook conventions](docs/notebooks.md)
 4. Run analysis in LiveBook (`mise run lab`)

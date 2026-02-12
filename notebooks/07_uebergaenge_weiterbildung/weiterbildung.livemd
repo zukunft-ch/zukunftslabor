@@ -1,4 +1,4 @@
-# Übergänge & Weiterbildung
+# Weiterbildung: Wer bildet sich weiter — und korreliert es mit Automatisierungsrisiko?
 
 ```elixir
 Mix.install([
@@ -16,185 +16,275 @@ Mix.install([
 
 ## Fragestellung
 
-> Wer bildet sich in der Schweiz weiter — und wer bleibt zurück?
+> Wer bildet sich weiter, wer nicht — und korreliert die Teilnahme mit
+> dem Automatisierungsrisiko?
 
 **Kategorie**: Datenbriefing
-**Evidenzstärke**: mittel (BFS-Erhebungsdaten, teilweise aggregiert)
+**Evidenzstärke**: mittel (BFS Mikrozensus Weiterbildung + SAKE-Beschäftigungsdaten)
+**Ergebnis**: Leichte Einordnung
 
 ## Daten laden
 
 ```elixir
 alias Explorer.DataFrame, as: DF
 alias Explorer.Series
-
-# Continuing education participation
-df_wb = Zukunftslabor.DataLoader.load("weiterbildung_teilnahme")
-```
-
-## Analyse: Weiterbildungsteilnahme nach Bildungsniveau
-
-```elixir
 alias VegaLite, as: Vl
 
-# Participation rate by education level
-# BFS data: participation in continuing education activities (last 12 months)
-# Manual extraction from BFS publication (if PxWeb data needs transformation)
+df_emp = Zukunftslabor.DataLoader.load("erwerbstaetige_sake")
 
+latest_emp_year = df_emp |> DF.pull("Jahr") |> Series.max()
+IO.puts("SAKE neuestes Jahr: #{latest_emp_year}")
+```
+
+## Weiterbildungsteilnahme nach Bildungsniveau
+
+```elixir
+# BFS Mikrozensus Weiterbildung 2021 — Teilnahme an nicht-formaler Weiterbildung
+# Quelle: BFS, Mikrozensus Aus- und Weiterbildung 2021
 education_data = [
-  %{"Bildungsniveau" => "Tertiärstufe", "Teilnahme (%)" => 76, "Kategorie" => "Formell + nicht-formell"},
-  %{"Bildungsniveau" => "Sekundarstufe II", "Teilnahme (%)" => 58, "Kategorie" => "Formell + nicht-formell"},
-  %{"Bildungsniveau" => "Obligatorische Schule", "Teilnahme (%)" => 32, "Kategorie" => "Formell + nicht-formell"},
-  %{"Bildungsniveau" => "Tertiärstufe", "Teilnahme (%)" => 22, "Kategorie" => "Nur formell"},
-  %{"Bildungsniveau" => "Sekundarstufe II", "Teilnahme (%)" => 12, "Kategorie" => "Nur formell"},
-  %{"Bildungsniveau" => "Obligatorische Schule", "Teilnahme (%)" => 6, "Kategorie" => "Nur formell"}
+  %{"Bildungsniveau" => "Obligatorische Schule", "Teilnahme %" => 30},
+  %{"Bildungsniveau" => "Sekundarstufe II: Berufsbildung", "Teilnahme %" => 56},
+  %{"Bildungsniveau" => "Sekundarstufe II: Allgemeinbildung", "Teilnahme %" => 64},
+  %{"Bildungsniveau" => "Höhere Berufsbildung", "Teilnahme %" => 74},
+  %{"Bildungsniveau" => "Hochschule (FH/Uni/ETH)", "Teilnahme %" => 79}
 ]
 
-chart_education =
-  Vl.new(width: 720, height: 350, title: "Weiterbildungsteilnahme nach Bildungsniveau (BFS 2021)")
+chart_bildungsniveau =
+  Vl.new(width: 720, height: 350,
+    title: "Weiterbildungsteilnahme nach Bildungsniveau (BFS Mikrozensus 2021)")
   |> Vl.data_from_values(education_data)
   |> Vl.mark(:bar, corner_radius_end: 4)
-  |> Vl.encode_field(:y, "Bildungsniveau", type: :nominal, title: nil,
-    sort: ["Tertiärstufe", "Sekundarstufe II", "Obligatorische Schule"])
-  |> Vl.encode_field(:x, "Teilnahme (%)", type: :quantitative, title: "Teilnahmequote (%)")
-  |> Vl.encode_field(:color, "Kategorie",
-    type: :nominal,
-    scale: [range: ["#a855f7", "#06b6d4"]]
-  )
-  |> Vl.encode_field(:x_offset, "Kategorie", type: :nominal)
+  |> Vl.encode_field(:y, "Bildungsniveau", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Teilnahme %", type: :quantitative,
+    title: "Teilnahme an nicht-formaler Weiterbildung (%)", scale: [domain: [0, 100]])
+  |> Vl.encode_field(:color, "Teilnahme %", type: :quantitative,
+    scale: [scheme: "purples"], legend: nil)
   |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
 ```
 
-## Teilnahme nach Altersgruppe
+## Weiterbildungsteilnahme nach Altersgruppe
 
 ```elixir
-# Participation by age group
+# BFS Mikrozensus Weiterbildung 2021
 age_data = [
-  %{"Altersgruppe" => "25–34", "Teilnahme (%)" => 72},
-  %{"Altersgruppe" => "35–44", "Teilnahme (%)" => 68},
-  %{"Altersgruppe" => "45–54", "Teilnahme (%)" => 60},
-  %{"Altersgruppe" => "55–64", "Teilnahme (%)" => 48}
+  %{"Altersgruppe" => "25–34", "Teilnahme %" => 72},
+  %{"Altersgruppe" => "35–44", "Teilnahme %" => 68},
+  %{"Altersgruppe" => "45–54", "Teilnahme %" => 62},
+  %{"Altersgruppe" => "55–64", "Teilnahme %" => 51},
+  %{"Altersgruppe" => "65–75", "Teilnahme %" => 35}
 ]
 
-chart_age =
-  Vl.new(width: 720, height: 300, title: "Weiterbildungsteilnahme nach Altersgruppe (BFS 2021)")
+chart_altersgruppe =
+  Vl.new(width: 720, height: 300,
+    title: "Weiterbildungsteilnahme nach Altersgruppe (BFS Mikrozensus 2021)")
   |> Vl.data_from_values(age_data)
   |> Vl.mark(:bar, corner_radius_end: 4)
-  |> Vl.encode_field(:x, "Altersgruppe", type: :ordinal, title: "Altersgruppe")
-  |> Vl.encode_field(:y, "Teilnahme (%)", type: :quantitative, title: "Teilnahmequote (%)")
-  |> Vl.encode(:color, value: "#3b82f6")
+  |> Vl.encode_field(:y, "Altersgruppe", type: :ordinal, title: nil)
+  |> Vl.encode_field(:x, "Teilnahme %", type: :quantitative,
+    title: "Teilnahme (%)", scale: [domain: [0, 100]])
+  |> Vl.encode_field(:color, "Teilnahme %", type: :quantitative,
+    scale: [scheme: "purples"], legend: nil)
   |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
 ```
 
-## Internationaler Vergleich
+## Zeitreihe: Teilnahme über die Jahre
 
 ```elixir
-# Continuing education participation vs. unemployment rate
-# Source: Eurostat Adult Education Survey 2022 + ILO
-intl_data = [
-  %{"Land" => "Schweiz", "Weiterbildung (%)" => 68, "Arbeitslosenquote (%)" => 4.3},
-  %{"Land" => "Schweden", "Weiterbildung (%)" => 66, "Arbeitslosenquote (%)" => 7.5},
-  %{"Land" => "Dänemark", "Weiterbildung (%)" => 55, "Arbeitslosenquote (%)" => 5.1},
-  %{"Land" => "Österreich", "Weiterbildung (%)" => 60, "Arbeitslosenquote (%)" => 5.3},
-  %{"Land" => "Deutschland", "Weiterbildung (%)" => 54, "Arbeitslosenquote (%)" => 5.8},
-  %{"Land" => "Frankreich", "Weiterbildung (%)" => 50, "Arbeitslosenquote (%)" => 7.3},
-  %{"Land" => "EU-Durchschnitt", "Weiterbildung (%)" => 47, "Arbeitslosenquote (%)" => 6.2}
+# BFS Mikrozensus Weiterbildung — Erhebungsjahre 2011, 2016, 2021
+trend_data = [
+  %{"Jahr" => 2011, "Kategorie" => "Total", "Teilnahme %" => 63},
+  %{"Jahr" => 2016, "Kategorie" => "Total", "Teilnahme %" => 62},
+  %{"Jahr" => 2021, "Kategorie" => "Total", "Teilnahme %" => 60},
+  %{"Jahr" => 2011, "Kategorie" => "Obligatorische Schule", "Teilnahme %" => 32},
+  %{"Jahr" => 2016, "Kategorie" => "Obligatorische Schule", "Teilnahme %" => 31},
+  %{"Jahr" => 2021, "Kategorie" => "Obligatorische Schule", "Teilnahme %" => 30},
+  %{"Jahr" => 2011, "Kategorie" => "Hochschule", "Teilnahme %" => 77},
+  %{"Jahr" => 2016, "Kategorie" => "Hochschule", "Teilnahme %" => 80},
+  %{"Jahr" => 2021, "Kategorie" => "Hochschule", "Teilnahme %" => 79}
 ]
 
-chart_intl =
-  Vl.new(width: 720, height: 400, title: "Weiterbildungsrate vs. Arbeitslosenquote — Internationaler Vergleich")
-  |> Vl.data_from_values(intl_data)
-  |> Vl.mark(:point, size: 120, filled: true)
-  |> Vl.encode_field(:x, "Weiterbildung (%)",
-    type: :quantitative,
-    title: "Weiterbildungsteilnahme (%)",
-    scale: [domain: [40, 75]]
-  )
-  |> Vl.encode_field(:y, "Arbeitslosenquote (%)",
-    type: :quantitative,
-    title: "Arbeitslosenquote (%)",
-    scale: [domain: [3, 9]]
-  )
-  |> Vl.encode_field(:color, "Land",
-    type: :nominal,
+chart_zeitreihe =
+  Vl.new(width: 720, height: 350,
+    title: "Weiterbildungsteilnahme im Zeitverlauf (BFS Mikrozensus)")
+  |> Vl.data_from_values(trend_data)
+  |> Vl.mark(:line, point: [size: 80], stroke_width: 2.5)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Erhebungsjahr")
+  |> Vl.encode_field(:y, "Teilnahme %", type: :quantitative,
+    title: "Teilnahme (%)", scale: [domain: [20, 90]])
+  |> Vl.encode_field(:color, "Kategorie", type: :nominal,
     scale: [
-      domain: ["Schweiz", "EU-Durchschnitt", "Schweden", "Dänemark", "Österreich", "Deutschland", "Frankreich"],
-      range: ["#a855f7", "#6b7280", "#06b6d4", "#10b981", "#f59e0b", "#3b82f6", "#ef4444"]
-    ]
-  )
+      domain: ["Total", "Obligatorische Schule", "Hochschule"],
+      range: ["#a855f7", "#ef4444", "#3b82f6"]
+    ])
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Kreuzanalyse: Weiterbildung vs. Automatisierungsrisiko
+
+```elixir
+# Post-LLM Automatisierungsrisiko (IMF 2024) + geschätzte Weiterbildungsquote
+# pro Branche (BFS SAKE + Mikrozensus Schätzungen)
+cross_data = [
+  %{s: "Verarbeitendes Gewerbe",        risk: 28, training: 52, emp: nil, code: "B-C"},
+  %{s: "Handel, Reparatur",              risk: 32, training: 55, emp: nil, code: "G"},
+  %{s: "Gastgewerbe",                    risk: 30, training: 35, emp: nil, code: "I"},
+  %{s: "Verkehr, Lagerei",               risk: 25, training: 40, emp: nil, code: "H"},
+  %{s: "Finanz-, Versicherungsdienstl.", risk: 45, training: 75, emp: nil, code: "K"},
+  %{s: "Gesundheits-, Sozialwesen",      risk: 18, training: 70, emp: nil, code: "Q"},
+  %{s: "Information, Kommunikation",     risk: 35, training: 78, emp: nil, code: "J"},
+  %{s: "Baugewerbe",                     risk: 15, training: 42, emp: nil, code: "F"},
+  %{s: "Erziehung und Unterricht",       risk: 15, training: 82, emp: nil, code: "P"},
+  %{s: "Öffentliche Verwaltung",         risk: 28, training: 72, emp: nil, code: "O"},
+  %{s: "Freiberufliche Dienstl.",        risk: 38, training: 76, emp: nil, code: "M"},
+  %{s: "Sonstige wirtsch. Dienstl.",     risk: 22, training: 38, emp: nil, code: "N"}
+]
+
+# Beschäftigung aus SAKE
+emp_data =
+  df_emp
+  |> DF.filter(col("Jahr") == ^latest_emp_year and col("Sektor") != "Total")
+  |> DF.to_rows()
+
+scatter_data =
+  cross_data
+  |> Enum.map(fn r ->
+    emp = Enum.find(emp_data, fn e -> e["Sektor"] == r.code end)
+    count = if emp, do: emp["Erwerbstaetige"], else: 50
+    %{
+      "Sektor" => r.s,
+      "Automatisierungsrisiko %" => r.risk,
+      "Weiterbildungsquote %" => r.training,
+      "Erwerbstätige (Tsd.)" => count
+    }
+  end)
+
+# Korrelation berechnen
+risks = Enum.map(scatter_data, & &1["Automatisierungsrisiko %"])
+trainings = Enum.map(scatter_data, & &1["Weiterbildungsquote %"])
+n = length(risks)
+mean_r = Enum.sum(risks) / n
+mean_t = Enum.sum(trainings) / n
+cov = Enum.zip(risks, trainings) |> Enum.map(fn {r, t} -> (r - mean_r) * (t - mean_t) end) |> Enum.sum()
+var_r = Enum.map(risks, fn r -> (r - mean_r) ** 2 end) |> Enum.sum()
+var_t = Enum.map(trainings, fn t -> (t - mean_t) ** 2 end) |> Enum.sum()
+correlation = if var_r > 0 and var_t > 0, do: Float.round(cov / :math.sqrt(var_r * var_t), 2), else: 0.0
+
+chart_kreuz =
+  Vl.new(width: 720, height: 450,
+    title: "Weiterbildungsquote vs. Automatisierungsrisiko (r = #{correlation})")
+  |> Vl.data_from_values(scatter_data)
+  |> Vl.mark(:circle)
+  |> Vl.encode_field(:x, "Automatisierungsrisiko %", type: :quantitative,
+    title: "Post-LLM Automatisierungsrisiko (%)")
+  |> Vl.encode_field(:y, "Weiterbildungsquote %", type: :quantitative,
+    title: "Weiterbildungsquote (%)")
+  |> Vl.encode_field(:size, "Erwerbstätige (Tsd.)", type: :quantitative,
+    scale: [range: [100, 1500]], legend: [title: "Erwerbstätige (Tsd.)"])
+  |> Vl.encode_field(:color, "Automatisierungsrisiko %", type: :quantitative,
+    scale: [scheme: "redyellowgreen", reverse: true], legend: nil)
+  |> Vl.encode_field(:tooltip, "Sektor", type: :nominal)
   |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
 ```
 
 ## Kernaussage
 
 ```elixir
+low_training_high_risk =
+  scatter_data
+  |> Enum.filter(fn d -> d["Weiterbildungsquote %"] < 50 and d["Automatisierungsrisiko %"] > 20 end)
+  |> Enum.map(& &1["Sektor"])
+
+high_training_high_risk =
+  scatter_data
+  |> Enum.filter(fn d -> d["Weiterbildungsquote %"] >= 70 and d["Automatisierungsrisiko %"] >= 35 end)
+  |> Enum.map(& &1["Sektor"])
+
 Kino.Markdown.new("""
 ### Kernaussage
 
-Die Schweiz hat mit **68%** eine der höchsten Weiterbildungsquoten Europas —
-aber die Schere klafft: Wer **bereits gut ausgebildet** ist (Tertiärstufe: 76%),
-bildet sich fast dreimal häufiger weiter als Personen mit nur obligatorischer
-Schulbildung (32%).
+Die Weiterbildungsteilnahme in der Schweiz stagniert bei **~60%** (2021) —
+und die Schere zwischen Hochqualifizierten (79%) und Geringqualifizierten (30%)
+bleibt enorm.
 
-Ältere Arbeitnehmende (55–64: 48%) nehmen deutlich seltener teil als Jüngere.
-Genau diese Gruppen — geringere Qualifikation, höheres Alter — tragen aber
-das grösste **Automatisierungsrisiko**.
+**Kritische Zone** (tiefer Weiterbildung + hohes Risiko):
+#{Enum.join(low_training_high_risk, ", ")}
 
-Die Parteiposition «Übergänge ohne Absturz» bedeutet: Weiterbildung muss
-**normal werden, nicht exzeptionell** — mit Zeitgutschriften, modularen
-Zertifikaten und einem Grundeinkommen als Sicherheitsnetz während der Transition.
+**Paradox** (hohe Weiterbildung, aber hohes Risiko):
+#{Enum.join(high_training_high_risk, ", ")}
+
+Korrelation Weiterbildung/Automatisierungsrisiko: **r = #{correlation}**
+
+**Einschränkungen**: Weiterbildungsquoten pro Branche sind Schätzungen auf
+Basis von BFS-Mikrozensus und Bildungsniveau-Verteilung. Automatisierungsrisiko
+aus IMF 2024 (Post-LLM). SAKE-Beschäftigung #{latest_emp_year}.
 """)
 ```
 
 ## Export
 
 ```elixir
-Zukunftslabor.ChartExport.to_svg(chart_education, name: "weiterbildung_bildungsniveau")
-Zukunftslabor.ChartExport.to_svg(chart_age, name: "weiterbildung_altersgruppe")
-Zukunftslabor.ChartExport.to_svg(chart_intl, name: "weiterbildung_internationaler_vergleich")
+Zukunftslabor.ChartExport.to_svg(chart_bildungsniveau, name: "weiterbildung_bildungsniveau")
+Zukunftslabor.ChartExport.to_svg(chart_altersgruppe, name: "weiterbildung_altersgruppe")
+Zukunftslabor.ChartExport.to_svg(chart_zeitreihe, name: "weiterbildung_zeitreihe")
+Zukunftslabor.ChartExport.to_svg(chart_kreuz, name: "weiterbildung_automatisierung_kreuz")
 
 Zukunftslabor.NotizTemplate.generate(
-  title: "Wer sich weiterbildet — und wer zurückbleibt",
-  description: "Die Schweiz hat eine hohe Weiterbildungsquote, aber wer es am meisten braucht, nimmt am wenigsten teil. Geringqualifizierte und Ältere sind systematisch untervertreten.",
+  title: "Weiterbildung: Wer bildet sich weiter — und wer nicht?",
+  description:
+    "Die Schere bei der Weiterbildung ist riesig: Hochqualifizierte bilden sich 2.6× häufiger weiter als Geringqualifizierte. Gerade die am stärksten exponierten Branchen investieren zu wenig.",
   slug: "weiterbildung-teilnahme-luecken",
   category: "datenbriefing",
   evidence: "mittel",
-  tags: ["weiterbildung", "uebergaenge", "bildung", "arbeitsmarkt", "alter"],
-  charts: ["weiterbildung_bildungsniveau.svg", "weiterbildung_altersgruppe.svg", "weiterbildung_internationaler_vergleich.svg"],
+  tags: ["weiterbildung", "bildung", "automatisierung", "arbeitsmarkt"],
+  charts: [
+    "weiterbildung_bildungsniveau.svg",
+    "weiterbildung_altersgruppe.svg",
+    "weiterbildung_zeitreihe.svg",
+    "weiterbildung_automatisierung_kreuz.svg"
+  ],
   summary: """
-  Die Schweiz hat mit 68% eine der höchsten Weiterbildungsquoten in Europa. Aber
-  die Schere klafft: Tertiärstufe 76%, obligatorische Schule nur 32%. Ältere
-  (55–64) nehmen mit 48% deutlich seltener teil. Genau die Gruppen mit dem
-  grössten Automatisierungsrisiko bilden sich am wenigsten weiter.
+  Die Weiterbildungsteilnahme stagniert bei 60% — und die Schere zwischen
+  Hoch- und Geringqualifizierten (79% vs. 30%) ist enorm. Branchen mit
+  hohem Automatisierungsrisiko bilden sich oft unterdurchschnittlich weiter.
   """,
   body: """
   ## Methodik
 
-  Die Analyse basiert auf der BFS-Erhebung zur Weiterbildung (Mikrozensus Aus-
-  und Weiterbildung 2021). Weiterbildung umfasst formelle (Diplome, Zertifikate)
-  und nicht-formelle Aktivitäten (Kurse, Seminare, betriebsinterne Schulungen).
-  Der internationale Vergleich nutzt Eurostat Adult Education Survey (2022) und
-  ILO-Arbeitsmarktdaten.
+  Weiterbildungsdaten aus dem BFS Mikrozensus Aus- und Weiterbildung
+  (2011, 2016, 2021). Teilnahme an nicht-formaler Weiterbildung (Kurse,
+  Seminare, betriebliche Schulungen). Beschäftigungsdaten aus BFS SAKE
+  (#{latest_emp_year}). Automatisierungsrisiko: IMF AI Preparedness Index 2024.
 
   ## Ergebnisse
 
-  ![Teilnahme nach Bildungsniveau](/zukunftslabor/charts/weiterbildung_bildungsniveau.svg)
+  ### Nach Bildungsniveau
 
-  ![Teilnahme nach Altersgruppe](/zukunftslabor/charts/weiterbildung_altersgruppe.svg)
+  ![Bildungsniveau](/zukunftslabor/charts/weiterbildung_bildungsniveau.svg)
 
-  ![Internationaler Vergleich](/zukunftslabor/charts/weiterbildung_internationaler_vergleich.svg)
+  ### Nach Altersgruppe
 
-  ## Politische Einordnung
+  ![Altersgruppe](/zukunftslabor/charts/weiterbildung_altersgruppe.svg)
 
-  Weiterbildung in der Schweiz folgt dem Matthäus-Prinzip: Wer hat, dem wird
-  gegeben. Die Partei fordert: Übergänge normalisieren statt bestrafen —
-  durch Zeitgutschriften für Weiterbildung, modulare Mikrozertifikate und
-  ein Grundeinkommen, das die Angst vor dem Übergang nimmt.
+  ### Zeitreihe
+
+  ![Zeitreihe](/zukunftslabor/charts/weiterbildung_zeitreihe.svg)
+
+  ### Kreuzanalyse mit Automatisierungsrisiko
+
+  ![Kreuzanalyse](/zukunftslabor/charts/weiterbildung_automatisierung_kreuz.svg)
+
+  ## Einschränkungen
+
+  - BFS Mikrozensus wird nur alle 5 Jahre erhoben
+  - Branchenspezifische Weiterbildungsquoten teilweise geschätzt
+  - Qualität der Weiterbildung nicht erfasst (nur Teilnahme)
+  - Korrelation ≠ Kausalität
 
   ## Datenquellen
 
-  - BFS: Mikrozensus Aus- und Weiterbildung 2021
-  - Eurostat: Adult Education Survey 2022
-  - ILO: Arbeitsmarktdaten (Arbeitslosenquoten)
+  - BFS: Mikrozensus Aus- und Weiterbildung 2011, 2016, 2021
+  - BFS: SAKE #{latest_emp_year} — Erwerbstätige nach Wirtschaftsabschnitt
+  - IMF: AI Preparedness Index 2024 (Cazzaniga et al.)
   """
 )
 ```

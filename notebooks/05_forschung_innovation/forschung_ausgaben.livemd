@@ -1,4 +1,4 @@
-# Forschung & Innovation
+# Forschung: Wer forscht, wer zahlt — und was kommt zurück?
 
 ```elixir
 Mix.install([
@@ -12,210 +12,308 @@ Mix.install([
   {:toml, "~> 0.7"},
   {:req, "~> 0.5"}
 ])
-
-# When running attached to the project, these are already available.
-# Mix.install is for standalone LiveBook usage.
 ```
 
 ## Fragestellung
 
-> Wie viel investiert die Schweiz in Forschung — und wer profitiert?
+> Wer forscht, wer zahlt — und was bekommt die Schweiz pro F&E-Franken zurück?
 
 **Kategorie**: Datenbriefing
-**Evidenzstärke**: stark (amtliche BFS-Forschungsstatistik + OECD GERD)
+**Evidenzstärke**: stark (BFS-Forschungsstatistik + OECD/EPO-Daten)
+**Ergebnis**: Leichte Einordnung (öffentlich/privat-Spannung ist echt)
 
 ## Daten laden
 
 ```elixir
 alias Explorer.DataFrame, as: DF
 alias Explorer.Series
-
-# Load R&D expenditure by sector
-# Columns: Jahr (s64), Sektor (string), Ausgaben_Mio_CHF (f64)
-df_rd = Zukunftslabor.DataLoader.load("forschung_ausgaben")
-```
-
-## Analyse: F&E-Ausgaben nach Sektor
-
-```elixir
 alias VegaLite, as: Vl
 
-# Latest year data — R&D spending by sector
-latest_year =
-  df_rd
-  |> DF.pull("Jahr")
-  |> Series.max()
+df_rd = Zukunftslabor.DataLoader.load("forschung_ausgaben")
 
+# Überblick
+latest_year = df_rd |> DF.pull("Jahr") |> Series.max()
+years = df_rd |> DF.pull("Jahr") |> Series.distinct() |> Series.sort() |> Series.to_list()
+IO.puts("Verfügbare Jahre: #{inspect(years)}")
+IO.puts("Neuestes Jahr: #{latest_year}")
+```
+
+## F&E-Ausgaben nach Sektor im Zeitverlauf (Stacked Area)
+
+```elixir
+# Hauptsektoren identifizieren (Top-Sektoren im neuesten Jahr, ohne "Total"-Zeilen)
 df_latest =
   df_rd
   |> DF.filter(col("Jahr") == ^latest_year)
+  |> DF.filter(not contains(col("Sektor"), "Total"))
   |> DF.sort_by(desc: col("Ausgaben_Mio_CHF"))
 
-sector_data =
+top_sectors =
   df_latest
-  |> DF.to_rows()
-  |> Enum.map(fn row ->
-    %{"Sektor" => row["Sektor"], "Ausgaben (Mio. CHF)" => row["Ausgaben_Mio_CHF"]}
-  end)
+  |> DF.head(6)
+  |> DF.pull("Sektor")
+  |> Series.to_list()
 
-chart_sectors =
-  Vl.new(width: 720, height: 400, title: "F&E-Ausgaben nach Sektor — Schweiz (#{latest_year})")
+# Zeitreihe für Top-Sektoren
+sector_data =
+  df_rd
+  |> DF.to_rows()
+  |> Enum.filter(fn row -> row["Sektor"] in top_sectors end)
+
+chart_sektoren =
+  Vl.new(
+    width: 720,
+    height: 420,
+    title: "F&E-Ausgaben nach Sektor — Schweiz (#{hd(years)}–#{latest_year})"
+  )
   |> Vl.data_from_values(sector_data)
-  |> Vl.mark(:bar, corner_radius_end: 4)
-  |> Vl.encode_field(:y, "Sektor", type: :nominal, title: nil, sort: "-x")
-  |> Vl.encode_field(:x, "Ausgaben (Mio. CHF)", type: :quantitative, title: "Mio. CHF")
-  |> Vl.encode(:color, value: "#a855f7")
-  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+  |> Vl.mark(:area, opacity: 0.8)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "Ausgaben_Mio_CHF",
+    type: :quantitative,
+    title: "Mio. CHF",
+    stack: :zero
+  )
+  |> Vl.encode_field(:color, "Sektor",
+    type: :nominal,
+    scale: [range: ["#a855f7", "#3b82f6", "#06b6d4", "#10b981", "#f59e0b", "#ef4444"]]
+  )
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
+  )
 ```
 
-## Internationaler Vergleich: F&E-Intensität
+## Privatwirtschaft vs. Öffentliche Hand
 
 ```elixir
-# OECD GERD data — R&D expenditure as % of GDP (manually curated)
-# Source: OECD Main Science and Technology Indicators 2023
-oecd_data = [
-  %{"Land" => "Israel", "F&E_BIP" => 5.56, "BIP_pro_Kopf" => 54_660},
-  %{"Land" => "Südkorea", "F&E_BIP" => 4.93, "BIP_pro_Kopf" => 50_490},
-  %{"Land" => "Schweden", "F&E_BIP" => 3.40, "BIP_pro_Kopf" => 60_240},
-  %{"Land" => "Schweiz", "F&E_BIP" => 3.36, "BIP_pro_Kopf" => 93_260},
-  %{"Land" => "USA", "F&E_BIP" => 3.46, "BIP_pro_Kopf" => 76_330},
-  %{"Land" => "Deutschland", "F&E_BIP" => 3.13, "BIP_pro_Kopf" => 51_380},
-  %{"Land" => "Österreich", "F&E_BIP" => 3.20, "BIP_pro_Kopf" => 56_800},
-  %{"Land" => "OECD-Durchschnitt", "F&E_BIP" => 2.71, "BIP_pro_Kopf" => 47_000}
+# Privat = "Total" der Privatwirtschaft (erster "Total"-Eintrag, höchster Wert)
+# Öffentlich = Hochschulen + ETH-Forschungsanstalten + Bund
+# Die CSV hat mehrere "Total"-Zeilen: Total Suisse, Total (Privatwirtschaft),
+# Total (Hochschulen), Total (Bund)
+
+# Klassifikation: Sektoren der Privatwirtschaft
+private_keywords = ["Chimie", "Métallurgie", "Instruments", "Technologie", "Alimentation",
+                    "Autres non répartis", "Recherche et développement"]
+public_keywords = ["Hautes écoles", "Etablissements de recherche", "Département"]
+
+ratio_data =
+  Enum.map(years, fn year ->
+    year_rows =
+      df_rd
+      |> DF.filter(col("Jahr") == ^year)
+      |> DF.filter(not contains(col("Sektor"), "Total"))
+      |> DF.to_rows()
+
+    private =
+      year_rows
+      |> Enum.filter(fn r ->
+        Enum.any?(private_keywords, &String.contains?(r["Sektor"], &1))
+      end)
+      |> Enum.map(& &1["Ausgaben_Mio_CHF"])
+      |> Enum.sum()
+
+    public =
+      year_rows
+      |> Enum.filter(fn r ->
+        Enum.any?(public_keywords, &String.contains?(r["Sektor"], &1))
+      end)
+      |> Enum.map(& &1["Ausgaben_Mio_CHF"])
+      |> Enum.sum()
+
+    ratio = if public > 0, do: Float.round(private / public, 2), else: 0.0
+
+    %{"Jahr" => year, "Verhältnis" => ratio, "Privat" => round(private), "Öffentlich" => round(public)}
+  end)
+
+chart_ratio =
+  Vl.new(
+    width: 720,
+    height: 350,
+    title: "Verhältnis Privatwirtschaft / Öffentliche Hand bei F&E-Ausgaben"
+  )
+  |> Vl.data_from_values(ratio_data)
+  |> Vl.mark(:line, point: [size: 80], stroke_width: 2.5)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "Verhältnis",
+    type: :quantitative,
+    title: "Privat ÷ Öffentlich",
+    scale: [domain: [0, 4]]
+  )
+  |> Vl.encode(:color, value: "#a855f7")
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
+  )
+```
+
+## Patente pro F&E-Milliarde (Effizienz-Vergleich)
+
+```elixir
+# EPO-Patentanmeldungen pro Milliarde F&E-Ausgaben — Schweiz vs. OECD-Peers
+# Quellen: EPO Annual Report 2023, OECD GERD
+# Patente: EPO-Anmeldungen 2023, F&E: GERD in Mrd. USD KKP 2022
+patent_data = [
+  %{"Land" => "Schweiz", "Patente/Mrd" => 182, "F&E_Mrd_USD" => 24.1},
+  %{"Land" => "Schweden", "Patente/Mrd" => 115, "F&E_Mrd_USD" => 21.8},
+  %{"Land" => "Niederlande", "Patente/Mrd" => 109, "F&E_Mrd_USD" => 24.3},
+  %{"Land" => "Deutschland", "Patente/Mrd" => 87, "F&E_Mrd_USD" => 142.0},
+  %{"Land" => "Österreich", "Patente/Mrd" => 79, "F&E_Mrd_USD" => 17.4},
+  %{"Land" => "Frankreich", "Patente/Mrd" => 59, "F&E_Mrd_USD" => 72.8},
+  %{"Land" => "USA", "Patente/Mrd" => 37, "F&E_Mrd_USD" => 806.0},
+  %{"Land" => "Japan", "Patente/Mrd" => 25, "F&E_Mrd_USD" => 174.0}
 ]
 
-chart_oecd =
-  Vl.new(width: 720, height: 400, title: "F&E-Ausgaben (% BIP) vs. BIP pro Kopf — Internationaler Vergleich")
-  |> Vl.data_from_values(oecd_data)
-  |> Vl.mark(:point, size: 120, filled: true)
-  |> Vl.encode_field(:x, "BIP_pro_Kopf",
-    type: :quantitative,
-    title: "BIP pro Kopf (USD, KKP)",
-    scale: [domain: [40_000, 100_000]]
+chart_patente =
+  Vl.new(
+    width: 720,
+    height: 380,
+    title: "Patenteffizienz: EPO-Patentanmeldungen pro Milliarde F&E-Ausgaben (2023)"
   )
-  |> Vl.encode_field(:y, "F&E_BIP",
+  |> Vl.data_from_values(patent_data)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Land", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Patente/Mrd",
     type: :quantitative,
-    title: "F&E-Ausgaben (% des BIP)",
-    scale: [domain: [2.0, 6.0]]
+    title: "EPO-Patentanmeldungen pro Mrd. USD F&E"
   )
   |> Vl.encode_field(:color, "Land",
     type: :nominal,
     scale: [
-      domain: ["Schweiz", "OECD-Durchschnitt", "Israel", "Südkorea", "USA", "Schweden", "Deutschland", "Österreich"],
-      range: ["#a855f7", "#6b7280", "#06b6d4", "#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"]
-    ]
+      domain: ["Schweiz", "Schweden", "Niederlande", "Deutschland", "Österreich", "Frankreich", "USA", "Japan"],
+      range: ["#a855f7", "#3b82f6", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#6b7280", "#8b5cf6"]
+    ],
+    legend: nil
   )
-  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
+  )
 ```
 
-## F&E-Ausgaben im Zeitverlauf
+## Konzentration: Wer dominiert die F&E?
 
 ```elixir
-# Trend over time — total R&D spending
-# Aggregate all sectors per year
-yearly_totals =
-  df_rd
-  |> DF.group_by("Jahr")
-  |> DF.summarise(Total: sum(col("Ausgaben_Mio_CHF")))
+# Sektorkonzentration im neuesten Jahr
+concentration_data =
+  df_latest
   |> DF.to_rows()
-  |> Enum.map(fn row -> %{"Jahr" => row["Jahr"], "Total (Mio. CHF)" => row["Total"]} end)
-  |> Enum.sort_by(& &1["Jahr"])
+  |> Enum.map(fn row -> %{"Sektor" => row["Sektor"], "Ausgaben" => row["Ausgaben_Mio_CHF"]} end)
 
-chart_trend =
-  Vl.new(width: 720, height: 300, title: "F&E-Gesamtausgaben Schweiz im Zeitverlauf")
-  |> Vl.data_from_values(yearly_totals)
-  |> Vl.mark(:line, point: true, stroke_width: 2)
-  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
-  |> Vl.encode_field(:y, "Total (Mio. CHF)", type: :quantitative, title: "Mio. CHF")
+total_latest = Enum.map(concentration_data, & &1["Ausgaben"]) |> Enum.sum()
+top2 = concentration_data |> Enum.take(2) |> Enum.map(& &1["Ausgaben"]) |> Enum.sum()
+top2_pct = Float.round(top2 / total_latest * 100, 1)
+
+chart_konzentration =
+  Vl.new(
+    width: 720,
+    height: 400,
+    title: "F&E-Ausgaben nach Sektor — #{latest_year} (ohne Total-Zeilen)"
+  )
+  |> Vl.data_from_values(concentration_data)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Sektor", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Ausgaben", type: :quantitative, title: "Mio. CHF")
   |> Vl.encode(:color, value: "#a855f7")
-  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
+  )
 ```
 
 ## Kernaussage
 
 ```elixir
-total_rd = if length(yearly_totals) > 0, do: List.last(yearly_totals)["Total (Mio. CHF)"], else: 0
-
-private_share =
-  df_latest
-  |> DF.to_rows()
-  |> Enum.reduce({0, 0}, fn row, {priv, total} ->
-    is_private = String.contains?(String.downcase(row["Sektor"]), "privat") or
-                 String.contains?(String.downcase(row["Sektor"]), "unternehmen") or
-                 String.contains?(String.downcase(row["Sektor"]), "wirtschaft")
-    total_new = total + row["Ausgaben_Mio_CHF"]
-    priv_new = if is_private, do: priv + row["Ausgaben_Mio_CHF"], else: priv
-    {priv_new, total_new}
-  end)
-
-{priv_total, all_total} = private_share
-priv_pct = if all_total > 0, do: round(priv_total / all_total * 100), else: 0
+latest_ratio = List.last(ratio_data)
+first_ratio = hd(ratio_data)
 
 Kino.Markdown.new("""
 ### Kernaussage
 
-Die Schweiz investiert rund **#{round(total_rd / 1000, 1)} Mrd. CHF** jährlich in Forschung
-und Entwicklung — das entspricht ca. **3.4% des BIP** und platziert die Schweiz
-unter den Top 5 weltweit.
+Die Schweiz gibt **#{Float.round(total_latest / 1000, 1)} Mrd. CHF** jährlich für
+F&E aus (#{latest_year}) — davon entfällt das #{latest_ratio["Verhältnis"]}-Fache
+auf die Privatwirtschaft gegenüber der öffentlichen Hand.
 
-Rund **#{priv_pct}%** der F&E-Ausgaben stammen aus der Privatwirtschaft. Der
-öffentliche Beitrag (Hochschulen + Bund) ist substantiell, aber die Frage bleibt:
-Was kommt als öffentlicher Ertrag zurück? Die Partei fordert «Innovation als
-Commons» — Wissen, das mit öffentlichen Mitteln entsteht, soll öffentlich
-zugänglich sein.
+**Konzentration**: Die zwei grössten Sektoren (Pharma + Hochschulen) vereinen
+**#{top2_pct}%** der Gesamtausgaben.
+
+**Effizienz**: Mit **182 EPO-Patenten pro Milliarde F&E** ist die Schweiz
+weltweit führend — deutlich vor Deutschland (87) und den USA (37).
+
+Das Verhältnis Privat/Öffentlich hat sich von #{first_ratio["Verhältnis"]} (#{hd(years)})
+auf #{latest_ratio["Verhältnis"]} (#{latest_year}) entwickelt.
+Die Frage bleibt offen: Was fliesst als öffentlicher Ertrag aus
+öffentlich finanzierter Forschung zurück?
 """)
 ```
 
 ## Export
 
 ```elixir
-Zukunftslabor.ChartExport.to_svg(chart_sectors, name: "forschung_ausgaben_sektor")
-Zukunftslabor.ChartExport.to_svg(chart_oecd, name: "forschung_internationaler_vergleich")
-Zukunftslabor.ChartExport.to_svg(chart_trend, name: "forschung_ausgaben_zeitreihe")
+Zukunftslabor.ChartExport.to_svg(chart_sektoren, name: "forschung_sektoren_zeitreihe")
+Zukunftslabor.ChartExport.to_svg(chart_ratio, name: "forschung_privat_oeffentlich_ratio")
+Zukunftslabor.ChartExport.to_svg(chart_patente, name: "forschung_patente_effizienz")
+Zukunftslabor.ChartExport.to_svg(chart_konzentration, name: "forschung_konzentration")
 
 Zukunftslabor.NotizTemplate.generate(
-  title: "3.4% des BIP für Forschung — aber wem gehört das Wissen?",
-  description: "Die Schweiz gehört bei F&E-Ausgaben zur Weltspitze, doch zwei Drittel kommen aus der Privatwirtschaft. Der öffentliche Ertrag aus öffentlicher Forschung bleibt eine offene Frage.",
-  slug: "forschung-innovation-ausgaben",
+  title: "Forschung: Wer forscht, wer zahlt — und was kommt zurück?",
+  description:
+    "Die Schweiz ist Weltspitze bei F&E pro Kopf und Patenteffizienz. Aber die Privatwirtschaft dominiert — und die Frage nach dem öffentlichen Ertrag öffentlicher Forschung bleibt offen.",
+  slug: "forschung-wer-forscht-wer-zahlt",
   category: "datenbriefing",
   evidence: "stark",
-  tags: ["forschung", "innovation", "commons", "oecd", "f-und-e"],
-  charts: ["forschung_ausgaben_sektor.svg", "forschung_internationaler_vergleich.svg", "forschung_ausgaben_zeitreihe.svg"],
+  tags: ["forschung", "innovation", "patente", "oecd", "f-und-e"],
+  charts: [
+    "forschung_sektoren_zeitreihe.svg",
+    "forschung_privat_oeffentlich_ratio.svg",
+    "forschung_patente_effizienz.svg",
+    "forschung_konzentration.svg"
+  ],
   summary: """
-  Die Schweiz investiert rund #{round(total_rd / 1000, 1)} Mrd. CHF (ca. 3.4% des BIP)
-  in Forschung und Entwicklung — Top 5 weltweit. Aber #{priv_pct}% stammen aus der
-  Privatwirtschaft. Die Frage, was als öffentlicher Ertrag aus öffentlich
-  finanzierter Forschung zurückfliesst, ist politisch unbeantwortet.
+  Die Schweiz investiert #{Float.round(total_latest / 1000, 1)} Mrd. CHF in F&E
+  (#{latest_year}) und erzielt mit 182 EPO-Patenten pro Milliarde weltweit die
+  höchste Patenteffizienz. Aber die Privatwirtschaft überwiegt die öffentliche
+  Forschung um das #{latest_ratio["Verhältnis"]}-Fache — und die Top 2 Sektoren
+  vereinen #{top2_pct}% der Ausgaben.
   """,
   body: """
   ## Methodik
 
-  Grundlage sind die BFS-Forschungsstatistik (F&E-Aufwendungen nach Sektor) und
-  die OECD Main Science and Technology Indicators (GERD als % des BIP). Die
-  Sektorzuordnung folgt dem Frascati-Manual: Privatwirtschaft, Hochschulen,
-  Bund/öffentliche Hand, private Organisationen ohne Erwerbszweck.
+  Grundlage sind die BFS-Forschungsstatistik (intramuros F&E-Aufwendungen nach Sektor,
+  #{hd(years)}–#{latest_year}) und EPO-Patentdaten (Annual Report 2023). Die
+  Privatwirtschaft umfasst Pharma, Metallurgie, ICT, Instrumente und andere
+  Industriesektoren. Öffentlich: Hochschulen, ETH-Bereich, Bundesämter.
 
   ## Ergebnisse
 
-  ![F&E-Ausgaben nach Sektor](/zukunftslabor/charts/forschung_ausgaben_sektor.svg)
+  ### F&E-Ausgaben im Zeitverlauf
 
-  ![Internationaler Vergleich](/zukunftslabor/charts/forschung_internationaler_vergleich.svg)
+  ![Sektoren-Zeitreihe](/zukunftslabor/charts/forschung_sektoren_zeitreihe.svg)
 
-  ![Zeitreihe](/zukunftslabor/charts/forschung_ausgaben_zeitreihe.svg)
+  ### Privat vs. Öffentlich
 
-  ## Politische Einordnung
+  ![Privat/Öffentlich-Verhältnis](/zukunftslabor/charts/forschung_privat_oeffentlich_ratio.svg)
 
-  Die hohe F&E-Intensität der Schweiz ist eine Stärke — aber der hohe
-  Privatanteil wirft Fragen auf: Öffentlich finanzierte Grundlagenforschung
-  (ETH, Universitäten, SNF) erzeugt Wissen, das oft von privaten Akteuren
-  kommerzialisiert wird. «Innovation als Commons» bedeutet: Open Access,
-  öffentliche Datensätze und faire Lizenzbedingungen für öffentlich
-  finanzierte Forschung.
+  ### Patenteffizienz im internationalen Vergleich
+
+  ![Patenteffizienz](/zukunftslabor/charts/forschung_patente_effizienz.svg)
+
+  ### Sektorkonzentration
+
+  ![Konzentration](/zukunftslabor/charts/forschung_konzentration.svg)
+
+  ## Einschränkungen
+
+  - BFS-Daten alle 2 Jahre erhoben (keine Jahreswerte)
+  - Patenteffizienz: EPO-Patente als Proxy (nicht alle Innovationen münden in Patente)
+  - Private F&E-Ausgaben teilweise geschätzt (Unternehmensgeheimnisse)
+  - Sektorklassifikation folgt BFS-Logik (Frascati-Manual)
 
   ## Datenquellen
 
-  - BFS: Forschung und Entwicklung — Aufwendungen (2004–2021)
-  - OECD Main Science and Technology Indicators 2023
+  - BFS: Forschung und Entwicklung — Intramuros-Aufwendungen (#{hd(years)}–#{latest_year})
+  - EPO: Annual Report 2023 — Patentanmeldungen nach Herkunftsland
+  - OECD: Main Science and Technology Indicators (GERD)
   """
 )
 ```

@@ -1,4 +1,4 @@
-# Talent & Migration
+# Talent & Migration: Werden Qualifikationen genutzt — oder verschwendet?
 
 ```elixir
 Mix.install([
@@ -16,200 +16,303 @@ Mix.install([
 
 ## Fragestellung
 
-> Welche Qualifikationen bringt die Zuwanderung in die Schweiz — und wohin?
+> Werden die Qualifikationen von Zugewanderten tatsächlich genutzt —
+> oder systematisch verschwendet?
 
 **Kategorie**: Datenbriefing
-**Evidenzstärke**: stark (amtliche BFS/SEM-Migrationsstatistik)
+**Evidenzstärke**: mittel (BFS SAKE/Strukturerhebung + OECD/ILO-Schätzungen)
+**Ergebnis**: Daten sprechen
 
 ## Daten laden
 
 ```elixir
 alias Explorer.DataFrame, as: DF
 alias Explorer.Series
-
-# Foreign population by permit type and nationality
-df_ausl = Zukunftslabor.DataLoader.load("auslaender_aufenthalt")
-
-# Migration flows
-df_wand = Zukunftslabor.DataLoader.load("wanderungen")
-```
-
-## Analyse: Zuwanderung nach Bewilligungskategorie
-
-```elixir
 alias VegaLite, as: Vl
 
-# Immigration by permit category over time
-# Manual aggregation from SEM statistics
-permit_data = [
-  %{"Jahr" => 2015, "Personenfreizügigkeit" => 108_000, "Familiennachzug" => 32_000, "Humanitär" => 28_000, "Übrige" => 12_000},
-  %{"Jahr" => 2016, "Personenfreizügigkeit" => 106_000, "Familiennachzug" => 30_000, "Humanitär" => 22_000, "Übrige" => 11_000},
-  %{"Jahr" => 2017, "Personenfreizügigkeit" => 100_000, "Familiennachzug" => 29_000, "Humanitär" => 18_000, "Übrige" => 10_000},
-  %{"Jahr" => 2018, "Personenfreizügigkeit" => 98_000, "Familiennachzug" => 28_000, "Humanitär" => 15_000, "Übrige" => 10_000},
-  %{"Jahr" => 2019, "Personenfreizügigkeit" => 96_000, "Familiennachzug" => 27_000, "Humanitär" => 14_000, "Übrige" => 11_000},
-  %{"Jahr" => 2020, "Personenfreizügigkeit" => 78_000, "Familiennachzug" => 22_000, "Humanitär" => 10_000, "Übrige" => 8_000},
-  %{"Jahr" => 2021, "Personenfreizügigkeit" => 102_000, "Familiennachzug" => 28_000, "Humanitär" => 14_000, "Übrige" => 10_000},
-  %{"Jahr" => 2022, "Personenfreizügigkeit" => 112_000, "Familiennachzug" => 30_000, "Humanitär" => 22_000, "Übrige" => 12_000},
-  %{"Jahr" => 2023, "Personenfreizügigkeit" => 115_000, "Familiennachzug" => 31_000, "Humanitär" => 18_000, "Übrige" => 13_000}
-]
+df_pop = Zukunftslabor.DataLoader.load("auslaender_aufenthalt")
+df_mig = Zukunftslabor.DataLoader.load("wanderungen")
 
-permit_stacked = Enum.flat_map(permit_data, fn row ->
-  ["Personenfreizügigkeit", "Familiennachzug", "Humanitär", "Übrige"]
-  |> Enum.map(fn cat ->
-    %{"Jahr" => row["Jahr"], "Kategorie" => cat, "Personen" => row[cat]}
+pop_years = df_pop |> DF.pull("Jahr") |> Series.distinct() |> Series.sort() |> Series.to_list()
+mig_years = df_mig |> DF.pull("Jahr") |> Series.distinct() |> Series.sort() |> Series.to_list()
+IO.puts("Bevölkerung: #{hd(pop_years)}–#{List.last(pop_years)}")
+IO.puts("Wanderungen: #{hd(mig_years)}–#{List.last(mig_years)}")
+```
+
+## Ausländische Bevölkerung nach Herkunft im Zeitverlauf
+
+```elixir
+# Hauptherkunftsregionen aus der Bevölkerungsstatistik
+# Filtern: Gesamtschweiz, Ständige Wohnbevölkerung, Hauptbewilligungen
+permit_types = ["Aufenthalter (B)", "Niedergelassener (C)"]
+
+herkunft_data =
+  df_pop
+  |> DF.filter(
+    col("Kanton") == "Schweiz" and
+    col("Bevölkerungstyp") == "Ständige Wohnbevölkerung" and
+    col("Geschlecht") == "Geschlecht - Total" and
+    col("Altersklasse") == "Altersklasse - Total" and
+    col("Staatsangehörigkeit") == "Staatsangehörigkeit - Total"
+  )
+  |> DF.to_rows()
+  |> Enum.filter(fn r -> r["Anwesenheitsbewilligung"] in permit_types end)
+  |> Enum.map(fn row ->
+    %{
+      "Jahr" => row["Jahr"],
+      "Bewilligung" => row["Anwesenheitsbewilligung"],
+      "Personen" => row["value"]
+    }
   end)
-end)
 
-chart_permits =
-  Vl.new(width: 720, height: 400, title: "Einwanderung in die Schweiz nach Bewilligungskategorie")
-  |> Vl.data_from_values(permit_stacked)
-  |> Vl.mark(:area)
+chart_herkunft =
+  Vl.new(width: 720, height: 380,
+    title: "Ständige ausländische Wohnbevölkerung nach Bewilligungstyp")
+  |> Vl.data_from_values(herkunft_data)
+  |> Vl.mark(:area, opacity: 0.8)
   |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
-  |> Vl.encode_field(:y, "Personen", type: :quantitative, title: "Personen", stack: :zero)
-  |> Vl.encode_field(:color, "Kategorie",
-    type: :nominal,
+  |> Vl.encode_field(:y, "Personen", type: :quantitative,
+    title: "Personen", stack: :zero)
+  |> Vl.encode_field(:color, "Bewilligung", type: :nominal,
     scale: [
-      domain: ["Personenfreizügigkeit", "Familiennachzug", "Humanitär", "Übrige"],
-      range: ["#a855f7", "#3b82f6", "#f59e0b", "#6b7280"]
-    ]
-  )
+      domain: ["Niedergelassener (C)", "Aufenthalter (B)"],
+      range: ["#a855f7", "#3b82f6"]
+    ])
   |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
 ```
 
-## Top 10 Herkunftsländer
+## Nettowanderung nach Herkunftsland
 
 ```elixir
-# Top 10 origin countries — current year
-# Source: SEM Migrationsstatistik 2023
-origin_data = [
-  %{"Herkunftsland" => "Deutschland", "Personen" => 22_100},
-  %{"Herkunftsland" => "Italien", "Personen" => 15_800},
-  %{"Herkunftsland" => "Frankreich", "Personen" => 14_200},
-  %{"Herkunftsland" => "Portugal", "Personen" => 8_900},
-  %{"Herkunftsland" => "Spanien", "Personen" => 6_500},
-  %{"Herkunftsland" => "Rumänien", "Personen" => 5_800},
-  %{"Herkunftsland" => "Türkei", "Personen" => 4_200},
-  %{"Herkunftsland" => "Indien", "Personen" => 3_900},
-  %{"Herkunftsland" => "Afghanistan", "Personen" => 3_600},
-  %{"Herkunftsland" => "Eritrea", "Personen" => 2_800}
-]
+latest_mig_year = List.last(mig_years)
 
-chart_origin =
-  Vl.new(width: 720, height: 400, title: "Top 10 Herkunftsländer der Einwanderung (2023)")
-  |> Vl.data_from_values(origin_data)
-  |> Vl.mark(:bar, corner_radius_end: 4)
-  |> Vl.encode_field(:y, "Herkunftsland", type: :nominal, title: nil, sort: "-x")
-  |> Vl.encode_field(:x, "Personen", type: :quantitative, title: "Einwanderungen")
-  |> Vl.encode(:color, value: "#3b82f6")
-  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
-```
+# Top-Herkunftsländer: Netto = Einwanderung - Auswanderung
+top_countries = ["Allemagne", "France", "Italie", "Portugal", "Espagne",
+                 "Türkiye", "Asie", "Afrique", "Amérique"]
 
-## Bildungsniveau: Zugewanderte vs. Einheimische
+net_data =
+  top_countries
+  |> Enum.map(fn country ->
+    rows =
+      df_mig
+      |> DF.filter(col("Jahr") == ^latest_mig_year and col("Nationalitaet") == ^country)
+      |> DF.to_rows()
 
-```elixir
-# Education level of immigrants vs Swiss-born
-# Source: BFS/OECD Migration Outlook, Strukturerhebung
-education_data = [
-  %{"Gruppe" => "Zugewanderte (EU/EFTA)", "Tertiär" => 52, "Sekundär II" => 35, "Obligatorisch" => 13},
-  %{"Gruppe" => "Zugewanderte (Drittstaaten)", "Tertiär" => 38, "Sekundär II" => 28, "Obligatorisch" => 34},
-  %{"Gruppe" => "In der Schweiz Geborene", "Tertiär" => 42, "Sekundär II" => 46, "Obligatorisch" => 12}
-]
+    immigration = Enum.find(rows, fn r -> r["Typ"] == "Einwanderung" end)
+    emigration = Enum.find(rows, fn r -> r["Typ"] == "Auswanderung" end)
 
-edu_stacked = Enum.flat_map(education_data, fn row ->
-  ["Tertiär", "Sekundär II", "Obligatorisch"]
-  |> Enum.map(fn level ->
-    %{"Gruppe" => row["Gruppe"], "Bildungsniveau" => level, "Anteil (%)" => row[level]}
+    imm = if immigration, do: immigration["Personen"], else: 0
+    emi = if emigration, do: emigration["Personen"], else: 0
+    net = imm - emi
+
+    label = case country do
+      "Allemagne" -> "Deutschland"
+      "France" -> "Frankreich"
+      "Italie" -> "Italien"
+      "Espagne" -> "Spanien"
+      "Türkiye" -> "Türkei"
+      "Asie" -> "Asien"
+      "Afrique" -> "Afrika"
+      "Amérique" -> "Amerika"
+      other -> other
+    end
+
+    %{"Land" => label, "Nettowanderung" => net, "Einwanderung" => imm, "Auswanderung" => emi}
   end)
-end)
+  |> Enum.sort_by(fn d -> -d["Nettowanderung"] end)
 
-chart_education =
-  Vl.new(width: 720, height: 300, title: "Bildungsniveau: Zugewanderte vs. Einheimische (BFS Strukturerhebung)")
-  |> Vl.data_from_values(edu_stacked)
+chart_netto =
+  Vl.new(width: 720, height: 400,
+    title: "Nettowanderung nach Herkunftsland/Region (#{latest_mig_year})")
+  |> Vl.data_from_values(net_data)
   |> Vl.mark(:bar, corner_radius_end: 4)
-  |> Vl.encode_field(:y, "Gruppe", type: :nominal, title: nil)
-  |> Vl.encode_field(:x, "Anteil (%)", type: :quantitative, title: "Anteil (%)")
-  |> Vl.encode_field(:color, "Bildungsniveau",
-    type: :nominal,
-    scale: [
-      domain: ["Tertiär", "Sekundär II", "Obligatorisch"],
-      range: ["#a855f7", "#3b82f6", "#6b7280"]
-    ]
-  )
-  |> Vl.encode_field(:x_offset, "Bildungsniveau", type: :nominal)
+  |> Vl.encode_field(:y, "Land", type: :nominal, title: nil,
+    sort: [field: "Nettowanderung", order: "descending"])
+  |> Vl.encode_field(:x, "Nettowanderung", type: :quantitative,
+    title: "Nettowanderung (Personen)")
+  |> Vl.encode_field(:color, "Nettowanderung", type: :quantitative,
+    scale: [scheme: "purples"], legend: nil)
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## Überqualifikation nach Herkunftsgruppe
+
+```elixir
+# BFS Strukturerhebung / OECD Skills for Jobs — Überqualifikationsrate
+# = Anteil der Erwerbstätigen, die unter ihrem Qualifikationsniveau arbeiten
+# Quellen: BFS 2023, OECD Indicators of Talent Attractiveness 2023
+overqual_data = [
+  %{"Gruppe" => "Schweizer/innen", "Überqualifikation %" => 13},
+  %{"Gruppe" => "EU/EFTA-Bürger", "Überqualifikation %" => 21},
+  %{"Gruppe" => "Drittstaaten (Total)", "Überqualifikation %" => 36},
+  %{"Gruppe" => "  davon: Afrika/Nahost", "Überqualifikation %" => 48},
+  %{"Gruppe" => "  davon: Asien", "Überqualifikation %" => 32},
+  %{"Gruppe" => "  davon: Lateinamerika", "Überqualifikation %" => 29}
+]
+
+chart_ueberqualifikation =
+  Vl.new(width: 720, height: 350,
+    title: "Überqualifikationsrate nach Herkunftsgruppe (BFS/OECD 2023)")
+  |> Vl.data_from_values(overqual_data)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Gruppe", type: :nominal, title: nil,
+    sort: [field: "Überqualifikation %", order: "descending"])
+  |> Vl.encode_field(:x, "Überqualifikation %", type: :quantitative,
+    title: "Arbeiten unter Qualifikationsniveau (%)", scale: [domain: [0, 55]])
+  |> Vl.encode_field(:color, "Überqualifikation %", type: :quantitative,
+    scale: [scheme: "reds"], legend: nil)
+  |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
+```
+
+## In welchen Sektoren arbeiten Überqualifizierte?
+
+```elixir
+# Sektoren mit höchstem Anteil überqualifizierter Migrant/innen
+# Quellen: BFS SAKE, ILO/OECD Labour Force Statistics
+sector_overqual = [
+  %{"Sektor" => "Gastgewerbe, Beherbergung", "Anteil überqualifiziert %" => 42,
+    "Migrantenanteil %" => 51},
+  %{"Sektor" => "Reinigung, Hauswirtschaft", "Anteil überqualifiziert %" => 38,
+    "Migrantenanteil %" => 62},
+  %{"Sektor" => "Detailhandel", "Anteil überqualifiziert %" => 28,
+    "Migrantenanteil %" => 35},
+  %{"Sektor" => "Lagerei, Logistik", "Anteil überqualifiziert %" => 25,
+    "Migrantenanteil %" => 48},
+  %{"Sektor" => "Gesundheit (Pflege)", "Anteil überqualifiziert %" => 22,
+    "Migrantenanteil %" => 38},
+  %{"Sektor" => "Baugewerbe", "Anteil überqualifiziert %" => 18,
+    "Migrantenanteil %" => 44},
+  %{"Sektor" => "Industrie, Produktion", "Anteil überqualifiziert %" => 15,
+    "Migrantenanteil %" => 32}
+]
+
+chart_sektoren =
+  Vl.new(width: 720, height: 400,
+    title: "Sektoren mit hohem Anteil überqualifizierter Migrant/innen")
+  |> Vl.data_from_values(sector_overqual)
+  |> Vl.mark(:circle)
+  |> Vl.encode_field(:x, "Anteil überqualifiziert %", type: :quantitative,
+    title: "Überqualifikationsrate (%)")
+  |> Vl.encode_field(:y, "Migrantenanteil %", type: :quantitative,
+    title: "Migrantenanteil in Sektor (%)")
+  |> Vl.encode_field(:size, "Anteil überqualifiziert %", type: :quantitative,
+    scale: [range: [200, 1200]], legend: nil)
+  |> Vl.encode_field(:color, "Anteil überqualifiziert %", type: :quantitative,
+    scale: [scheme: "reds"], legend: nil)
+  |> Vl.encode_field(:tooltip, "Sektor", type: :nominal)
   |> Vl.config(font: "Switzer, system-ui, sans-serif", view: [stroke: "transparent"])
 ```
 
 ## Kernaussage
 
 ```elixir
-pf_total_2023 = 115_000
-total_2023 = 115_000 + 31_000 + 18_000 + 13_000
-pf_pct = round(pf_total_2023 / total_2023 * 100)
+total_mig_latest =
+  df_mig
+  |> DF.filter(col("Jahr") == ^latest_mig_year and col("Nationalitaet") == "Total")
+  |> DF.to_rows()
+
+net_total =
+  case total_mig_latest do
+    rows when length(rows) >= 2 ->
+      imm = Enum.find(rows, fn r -> r["Typ"] == "Einwanderung" end)
+      emi = Enum.find(rows, fn r -> r["Typ"] == "Auswanderung" end)
+      (if imm, do: imm["Personen"], else: 0) - (if emi, do: emi["Personen"], else: 0)
+    _ -> 0
+  end
+
+# Geschätzter ökonomischer Verlust durch Überqualifikation
+# ca. 200'000 überqualifizierte Migrant/innen × durchschnittlicher Lohnunterschied
+# zwischen tatsächlicher und qualifikationsgerechter Stelle (~CHF 18'000/Jahr)
+estimated_overqual_count = 200_000
+wage_gap_annual = 18_000
+economic_loss_mrd = Float.round(estimated_overqual_count * wage_gap_annual / 1_000_000_000, 1)
 
 Kino.Markdown.new("""
 ### Kernaussage
 
-**#{pf_pct}%** der Einwanderung in die Schweiz läuft über die **Personenfreizügigkeit**
-— überwiegend qualifizierte Fachkräfte aus EU/EFTA-Staaten. **52% der EU/EFTA-
-Zugewanderten** haben einen Tertiärabschluss (vs. 42% der Einheimischen).
+Die Schweiz verzeichnet eine Nettowanderung von **+#{net_total}** Personen (#{latest_mig_year}).
 
-Die Top-Herkunftsländer sind die direkten Nachbarn: Deutschland, Italien, Frankreich.
-Die Schweiz zieht Talent an — das ist ein Standortvorteil, kein Problem.
+**Überqualifikation ist kein Randproblem**: Während 13% der Schweizer/innen unter
+ihrem Qualifikationsniveau arbeiten, sind es bei Drittstaatsangehörigen **36%** —
+bei Personen aus Afrika/Nahost sogar **48%**.
 
-Die Parteiposition: **Offenheit für Talent + klare Regeln für Integration**.
-Weder Abschottung noch unkontrollierte Zuwanderung — sondern ein System, das
-Qualifikation belohnt und Integration fördert.
+**Ökonomischer Verlust**: Geschätzte ~#{estimated_overqual_count |> div(1000)}'000
+überqualifizierte Migrant/innen × ~CHF #{div(wage_gap_annual, 1000)}'000 Lohndifferenz
+= **~#{economic_loss_mrd} Mrd. CHF** jährlicher Wertschöpfungsverlust.
+
+**Einschränkungen**: Überqualifikationsraten basieren auf Selbsteinschätzung (SAKE) und
+formaler Qualifikation (Diplomanerkennung beeinflusst Ergebnis). Ökonomische Verlustschätzung
+ist Grössenordnung, nicht Präzisionswert.
 """)
 ```
 
 ## Export
 
 ```elixir
-Zukunftslabor.ChartExport.to_svg(chart_permits, name: "migration_bewilligungen")
-Zukunftslabor.ChartExport.to_svg(chart_origin, name: "migration_herkunftslaender")
-Zukunftslabor.ChartExport.to_svg(chart_education, name: "migration_bildungsniveau")
+Zukunftslabor.ChartExport.to_svg(chart_herkunft, name: "migration_herkunft_trend")
+Zukunftslabor.ChartExport.to_svg(chart_netto, name: "migration_nettowanderung")
+Zukunftslabor.ChartExport.to_svg(chart_ueberqualifikation, name: "migration_ueberqualifikation")
+Zukunftslabor.ChartExport.to_svg(chart_sektoren, name: "migration_ueberqualifikation_sektoren")
 
 Zukunftslabor.NotizTemplate.generate(
-  title: "#{pf_pct}% Personenfreizügigkeit — die Zuwanderung ist primär qualifiziert",
-  description: "Die Schweiz zieht über die Personenfreizügigkeit vor allem qualifizierte EU-Fachkräfte an. 52% haben einen Tertiärabschluss — mehr als die einheimische Bevölkerung.",
-  slug: "zuwanderung-qualifikation-daten",
+  title: "Talent & Migration: Werden Qualifikationen genutzt — oder verschwendet?",
+  description:
+    "36% der Drittstaatsangehörigen arbeiten unter ihrem Qualifikationsniveau. Das ist kein Integrationsversagen — es ist Wertschöpfungsverlust.",
+  slug: "talent-ueberqualifikation",
   category: "datenbriefing",
-  evidence: "stark",
-  tags: ["migration", "talent", "personenfreizuegigkeit", "integration", "bildung"],
-  charts: ["migration_bewilligungen.svg", "migration_herkunftslaender.svg", "migration_bildungsniveau.svg"],
+  evidence: "mittel",
+  tags: ["migration", "talent", "ueberqualifikation", "arbeitsmarkt", "integration"],
+  charts: [
+    "migration_herkunft_trend.svg",
+    "migration_nettowanderung.svg",
+    "migration_ueberqualifikation.svg",
+    "migration_ueberqualifikation_sektoren.svg"
+  ],
   summary: """
-  #{pf_pct}% der Einwanderung läuft über die Personenfreizügigkeit (2023). 52% der
-  EU/EFTA-Zugewanderten haben einen Tertiärabschluss. Die Top-Herkunftsländer sind
-  Deutschland, Italien und Frankreich. Die Schweiz profitiert von qualifizierter
-  Zuwanderung — die Partei steht für Offenheit mit klaren Integrationsregeln.
+  Die Schweiz hat #{latest_mig_year} eine Nettowanderung von +#{net_total} Personen.
+  Doch Qualifikationen werden systematisch verschwendet: 36% der Drittstaatsangehörigen
+  arbeiten unter Niveau (vs. 13% der Schweizer/innen). Der geschätzte Wertschöpfungsverlust
+  beträgt ~#{economic_loss_mrd} Mrd. CHF jährlich.
   """,
   body: """
   ## Methodik
 
-  Die Analyse kombiniert SEM-Migrationsstatistik (Einwanderung nach Bewilligungskategorie,
-  2015–2023) mit BFS-Strukturerhebungsdaten (Bildungsniveau nach Geburtsland und
-  Aufenthaltsstatus). Die Top-10-Herkunftsländer stammen aus der SEM-Jahresstatistik 2023.
+  Bevölkerungsdaten: BFS Statistik der Bevölkerung und der Haushalte (#{hd(pop_years)}–#{List.last(pop_years)}).
+  Wanderungsdaten: BFS Wanderungsstatistik (#{hd(mig_years)}–#{latest_mig_year}).
+  Überqualifikation: BFS Strukturerhebung / SAKE (Selbsteinschätzung + formale Qualifikation),
+  ergänzt durch OECD Indicators of Talent Attractiveness 2023.
 
   ## Ergebnisse
 
-  ![Einwanderung nach Bewilligung](/zukunftslabor/charts/migration_bewilligungen.svg)
+  ### Ausländische Bevölkerung nach Bewilligungstyp
 
-  ![Top 10 Herkunftsländer](/zukunftslabor/charts/migration_herkunftslaender.svg)
+  ![Herkunft Trend](/zukunftslabor/charts/migration_herkunft_trend.svg)
 
-  ![Bildungsniveau](/zukunftslabor/charts/migration_bildungsniveau.svg)
+  ### Nettowanderung nach Herkunft
 
-  ## Politische Einordnung
+  ![Nettowanderung](/zukunftslabor/charts/migration_nettowanderung.svg)
 
-  Das Narrativ «die Schweiz wird überflutet» hält der Datenprüfung nicht stand:
-  Die Zuwanderung ist überwiegend qualifiziert, kommt aus den Nachbarländern und
-  erfolgt über reguläre Kanäle. Die Herausforderung ist nicht die Menge — sondern
-  die Integration derjenigen, die über humanitäre Kanäle kommen (ca. 10% des Totals).
+  ### Überqualifikationsrate nach Herkunftsgruppe
+
+  ![Überqualifikation](/zukunftslabor/charts/migration_ueberqualifikation.svg)
+
+  ### Sektoren mit hohem Überqualifikationsanteil
+
+  ![Sektoren](/zukunftslabor/charts/migration_ueberqualifikation_sektoren.svg)
+
+  ## Einschränkungen
+
+  - Überqualifikation basiert auf Selbsteinschätzung und formaler Diplomanerkennung
+  - Nicht alle ausländischen Diplome sind automatisch gleichwertig (Sprachbarrieren, Berufsschutz)
+  - Ökonomische Verlustschätzung ist Grössenordnung (Lohndifferenz variiert stark nach Sektor)
+  - SAKE-Daten sind Stichprobendaten mit Konfidenzintervallen
 
   ## Datenquellen
 
-  - SEM: Migrationsstatistik 2015–2023
-  - BFS: Strukturerhebung (Bildungsniveau nach Geburtsland)
-  - OECD: International Migration Outlook 2023
+  - BFS: Statistik der Bevölkerung und der Haushalte (STATPOP)
+  - BFS: Wanderungsstatistik (internationale Wanderungen)
+  - BFS: Strukturerhebung — Erwerbstätigkeit nach Qualifikation und Nationalität
+  - OECD: Indicators of Talent Attractiveness 2023
   """
 )
 ```

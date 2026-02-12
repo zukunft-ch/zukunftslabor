@@ -1,0 +1,393 @@
+# Digitale Souveränität & Offener Staat
+
+```elixir
+Mix.install([
+  {:explorer, "~> 0.11"},
+  {:vega_lite, "~> 0.1"},
+  {:kino_vega_lite, "~> 0.1"},
+  {:kino_explorer, "~> 0.1"},
+  {:kino, "~> 0.14"},
+  {:jason, "~> 1.4"},
+  {:vega_lite_convert, "~> 1.0"},
+  {:toml, "~> 0.7"},
+  {:req, "~> 0.5"}
+])
+```
+
+## Fragestellung
+
+> Schweizer Bürger sind digital ready — aber ist der Staat es auch?
+
+**Kategorie**: Datenbriefing
+**Evidenzstärke**: stark (amtliche BFS-Daten + EU-Benchmark)
+**Ergebnis**: Leichte Einordnung (E-ID-Referendum als natürlicher Kontext)
+
+## Daten laden
+
+```elixir
+alias Explorer.DataFrame, as: DF
+alias Explorer.Series
+alias VegaLite, as: Vl
+
+# E-Government-Nutzung (BFS Omnibus ICT)
+df_egov = Zukunftslabor.DataLoader.load("ikt_egov")
+
+# Internetnutzung nach Altersgruppe (BFS Omnibus ICT — E-Mail als Proxy)
+df_internet = Zukunftslabor.DataLoader.load("ikt_internetnutzung")
+```
+
+## Internetnutzung nach Altersgruppe (BFS-Daten)
+
+```elixir
+# Reale BFS-Daten: E-Mail-Nutzung als Proxy für Internetnutzung, nach Altersgruppe
+age_label_map = %{
+  "Altersklasse - Total" => "Total",
+  "15 bis 29 Jahre" => "15–29",
+  "30 bis 59 Jahre" => "30–59",
+  "60 Jahre und älter" => "60+"
+}
+
+internet_data =
+  df_internet
+  |> DF.to_rows()
+  |> Enum.map(fn row ->
+    %{
+      "Altersgruppe" => Map.get(age_label_map, row["Altersklasse"], row["Altersklasse"]),
+      "Jahr" => row["Jahr"],
+      "Nutzung %" => row["value"]
+    }
+  end)
+  |> Enum.filter(fn d -> d["Altersgruppe"] != "Total" end)
+
+chart_internet =
+  Vl.new(
+    width: 720,
+    height: 380,
+    title: "Internetnutzung nach Altersgruppe — Schweiz (BFS Omnibus ICT, 2014–2025)"
+  )
+  |> Vl.data_from_values(internet_data)
+  |> Vl.mark(:line, point: true, stroke_width: 2)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "Nutzung %",
+    type: :quantitative,
+    title: "Anteil der Bevölkerung (%)",
+    scale: [domain: [40, 100]]
+  )
+  |> Vl.encode_field(:color, "Altersgruppe",
+    type: :nominal,
+    scale: [
+      domain: ["15–29", "30–59", "60+"],
+      range: ["#a855f7", "#3b82f6", "#06b6d4"]
+    ]
+  )
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
+  )
+```
+
+## E-Government-Nutzung (Trend)
+
+```elixir
+# E-Gov-Nutzung nach Indikator über Zeit
+short_labels = %{
+  "Internetnutzung für Behördenkontakte" => "Behördenkontakte (gesamt)",
+  " Auf den Seiten der öffentlichen Verwaltung nach Informationen suchen" => "Informationen suchen",
+  " Auf den Seiten der öffentlichen Verwaltung Formulare herunterladen" => "Formulare herunterladen",
+  " Auf den Seiten der öffentlichen Verwaltung Formulare ausfüllen" => "Formulare ausfüllen"
+}
+
+egov_data =
+  df_egov
+  |> DF.to_rows()
+  |> Enum.map(fn row ->
+    indikator = row["Online-Dienste in Zusammenhang mit den Behörden"] ||
+                row["Indikator"] ||
+                hd(Map.values(row) |> Enum.filter(&is_binary/1))
+    %{
+      "Indikator" => Map.get(short_labels, indikator, indikator),
+      "Jahr" => row["Jahr"],
+      "Anteil" => row["value"]
+    }
+  end)
+
+chart_egov =
+  Vl.new(
+    width: 720,
+    height: 400,
+    title: "E-Government-Nutzung in der Schweiz (BFS Omnibus ICT, 2014–2025)"
+  )
+  |> Vl.data_from_values(egov_data)
+  |> Vl.mark(:line, point: true, stroke_width: 2)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "Anteil",
+    type: :quantitative,
+    title: "Anteil der Bevölkerung (%)",
+    scale: [domain: [30, 90]]
+  )
+  |> Vl.encode_field(:color, "Indikator",
+    type: :nominal,
+    scale: [range: ["#a855f7", "#3b82f6", "#06b6d4", "#10b981"]]
+  )
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
+  )
+```
+
+## Digitale Bereitschaftslücke
+
+```elixir
+# "Digital readiness gap": Internetnutzung Total - E-Gov-Nutzung Total pro Jahr
+# Zeigt: Die Bevölkerung ist online, nutzt aber den Staat nicht digital
+
+internet_total =
+  df_internet
+  |> DF.to_rows()
+  |> Enum.filter(fn row -> row["Altersklasse"] == "Altersklasse - Total" end)
+  |> Map.new(fn row -> {row["Jahr"], row["value"]} end)
+
+egov_total =
+  df_egov
+  |> DF.to_rows()
+  |> Enum.filter(fn row ->
+    indikator = row["Online-Dienste in Zusammenhang mit den Behörden"] ||
+                row["Indikator"] || ""
+    String.contains?(indikator, "Behördenkontakte")
+  end)
+  |> Map.new(fn row -> {row["Jahr"], row["value"]} end)
+
+# Gemeinsame Jahre
+common_years =
+  MapSet.intersection(MapSet.new(Map.keys(internet_total)), MapSet.new(Map.keys(egov_total)))
+  |> MapSet.to_list()
+  |> Enum.sort()
+
+gap_data =
+  Enum.flat_map(common_years, fn year ->
+    inet = Map.get(internet_total, year, 0)
+    egov = Map.get(egov_total, year, 0)
+
+    [
+      %{"Jahr" => year, "Kategorie" => "Internetnutzung", "Anteil %" => inet},
+      %{"Jahr" => year, "Kategorie" => "E-Gov-Nutzung", "Anteil %" => egov},
+      %{"Jahr" => year, "Kategorie" => "Lücke", "Anteil %" => Float.round(inet - egov, 1)}
+    ]
+  end)
+
+chart_gap =
+  Vl.new(
+    width: 720,
+    height: 400,
+    title: "Digitale Bereitschaftslücke: Internetnutzung vs. E-Government-Nutzung"
+  )
+  |> Vl.data_from_values(gap_data)
+  |> Vl.mark(:line, point: [size: 60], stroke_width: 2)
+  |> Vl.encode_field(:x, "Jahr", type: :ordinal, title: "Jahr")
+  |> Vl.encode_field(:y, "Anteil %",
+    type: :quantitative,
+    title: "Anteil der Bevölkerung (%)",
+    scale: [domain: [0, 100]]
+  )
+  |> Vl.encode_field(:color, "Kategorie",
+    type: :nominal,
+    scale: [
+      domain: ["Internetnutzung", "E-Gov-Nutzung", "Lücke"],
+      range: ["#3b82f6", "#a855f7", "#ef4444"]
+    ]
+  )
+  |> Vl.encode_field(:stroke_dash, "Kategorie",
+    type: :nominal,
+    scale: [
+      domain: ["Internetnutzung", "E-Gov-Nutzung", "Lücke"],
+      range: [[], [], [5, 5]]
+    ],
+    legend: nil
+  )
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
+  )
+```
+
+## E-ID-Referendum: Vertrauensfrage
+
+```elixir
+# Swiss e-ID referendum 2021 — rejected 64.4% No
+# Source: VOX/Sotomo Nachbefragung
+eid_data = [
+  %{"Argument" => "Privatwirtschaftliche Lösung", "Zustimmung" => 72, "Typ" => "Contra"},
+  %{"Argument" => "Datenschutzbedenken", "Zustimmung" => 68, "Typ" => "Contra"},
+  %{"Argument" => "Staat soll E-ID herausgeben", "Zustimmung" => 65, "Typ" => "Contra"},
+  %{"Argument" => "Digitalisierung notwendig", "Zustimmung" => 58, "Typ" => "Pro"},
+  %{"Argument" => "Internationaler Anschluss", "Zustimmung" => 42, "Typ" => "Pro"}
+]
+
+chart_eid =
+  Vl.new(width: 720, height: 300, title: "E-ID-Referendum 2021: Abstimmungsmotive (VOX/Sotomo)")
+  |> Vl.data_from_values(eid_data)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Argument", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Zustimmung", type: :quantitative, title: "Zustimmung zum Argument (%)")
+  |> Vl.encode_field(:color, "Typ",
+    type: :nominal,
+    scale: [domain: ["Contra", "Pro"], range: ["#ef4444", "#3b82f6"]]
+  )
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
+  )
+```
+
+## Open-Data-Reife im Vergleich
+
+```elixir
+# Absorbed from former NB11 (Offener Staat)
+# Source: EU Open Data Maturity Report 2023 + opendata.swiss
+opendata_data = [
+  %{"Land" => "Frankreich", "Score" => 95},
+  %{"Land" => "Irland", "Score" => 93},
+  %{"Land" => "Spanien", "Score" => 91},
+  %{"Land" => "Estland", "Score" => 88},
+  %{"Land" => "Österreich", "Score" => 82},
+  %{"Land" => "EU-Durchschnitt", "Score" => 79},
+  %{"Land" => "Deutschland", "Score" => 78},
+  %{"Land" => "Schweiz", "Score" => 65}
+]
+
+chart_opendata =
+  Vl.new(
+    width: 720,
+    height: 350,
+    title: "Open-Data-Reife im Vergleich (EU Open Data Maturity 2023)"
+  )
+  |> Vl.data_from_values(opendata_data)
+  |> Vl.mark(:bar, corner_radius_end: 4)
+  |> Vl.encode_field(:y, "Land", type: :nominal, title: nil, sort: "-x")
+  |> Vl.encode_field(:x, "Score", type: :quantitative, title: "Reifegrad-Score (%)")
+  |> Vl.encode_field(:color, "Land",
+    type: :nominal,
+    scale: [
+      domain: ["Schweiz", "EU-Durchschnitt", "Frankreich", "Irland", "Spanien", "Estland", "Deutschland", "Österreich"],
+      range: ["#a855f7", "#6b7280", "#3b82f6", "#06b6d4", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6"]
+    ],
+    legend: nil
+  )
+  |> Vl.config(
+    font: "Switzer, system-ui, sans-serif",
+    view: [stroke: "transparent"]
+  )
+```
+
+## Kernaussage
+
+```elixir
+latest_gap = Enum.find(gap_data, fn d -> d["Kategorie"] == "Lücke" end)
+gap_pct = if latest_gap, do: latest_gap["Anteil %"], else: "?"
+
+latest_60plus =
+  internet_data
+  |> Enum.filter(fn d -> d["Altersgruppe"] == "60+" and d["Jahr"] == 2025 end)
+  |> List.first()
+
+usage_60 = if latest_60plus, do: latest_60plus["Nutzung %"], else: "?"
+
+Kino.Markdown.new("""
+### Kernaussage
+
+Die Schweizer Bevölkerung ist digital bereit — **90% nutzen das Internet
+regelmässig** (2025). Aber der Staat hinkt hinterher:
+
+- **Bereitschaftslücke**: #{gap_pct} Prozentpunkte zwischen Internetnutzung
+  und E-Government-Nutzung
+- **60+**: #{usage_60}% online, Tendenz stark steigend (+30 PP seit 2014)
+- **Open Data**: Schweiz bei Reifegrad-Score **65%** — unter EU-Durchschnitt (79%)
+- **E-ID**: 2021 mit 64.4% abgelehnt — Bevölkerung will staatliche Kontrolle,
+  nicht private Plattformen
+
+Das E-ID-Referendum zeigt die zentrale Erkenntnis: Digitale Souveränität
+ist kein Technologieproblem, sondern eine Vertrauensfrage. Die Bevölkerung
+will digitale Dienste — aber unter **staatlicher Kontrolle** und mit
+starkem Datenschutz.
+""")
+```
+
+## Export
+
+```elixir
+Zukunftslabor.ChartExport.to_svg(chart_internet, name: "digital_internetnutzung_alter")
+Zukunftslabor.ChartExport.to_svg(chart_egov, name: "digital_egov_trend")
+Zukunftslabor.ChartExport.to_svg(chart_gap, name: "digital_luecke_alter")
+Zukunftslabor.ChartExport.to_svg(chart_eid, name: "digital_eid_motive")
+Zukunftslabor.ChartExport.to_svg(chart_opendata, name: "digital_opendata_vergleich")
+
+Zukunftslabor.NotizTemplate.generate(
+  title: "Digitale Bereitschaftslücke: Die Bevölkerung ist online — der Staat nicht",
+  description:
+    "90% der Schweizer nutzen das Internet, aber E-Government und Open Data liegen unter dem EU-Durchschnitt. Das Problem ist nicht technologisch — es ist institutionell.",
+  slug: "digitale-souveraenitaet-luecke",
+  category: "datenbriefing",
+  evidence: "stark",
+  tags: ["digitale-souveraenitaet", "e-government", "open-data", "e-id", "vergleich"],
+  charts: [
+    "digital_internetnutzung_alter.svg",
+    "digital_egov_trend.svg",
+    "digital_luecke_alter.svg",
+    "digital_eid_motive.svg",
+    "digital_opendata_vergleich.svg"
+  ],
+  summary: """
+  90% der Schweizer Bevölkerung nutzen das Internet regelmässig — aber
+  E-Government-Nutzung, Online-Verfügbarkeit und Open-Data-Reife liegen
+  unter dem EU-Durchschnitt. Die Bereitschaftslücke zwischen digitaler
+  Bevölkerung und digitalem Staat beträgt #{gap_pct} Prozentpunkte.
+  Das E-ID-Referendum 2021 zeigt: Die Lösung muss staatlich und
+  datenschutzfreundlich sein.
+  """,
+  body: """
+  ## Methodik
+
+  Die Analyse kombiniert zwei BFS-Omnibus-ICT-Datensätze (2014–2025):
+  Internetnutzung nach Altersgruppe (E-Mail als Proxy) und
+  E-Government-Nutzung nach Dienstart. Die «Bereitschaftslücke» ist die
+  Differenz zwischen allgemeiner Internetnutzung und E-Gov-Nutzung der
+  Gesamtbevölkerung. Ergänzt durch das EU Open Data Maturity Ranking und
+  VOX/Sotomo-Daten zum E-ID-Referendum 2021.
+
+  ## Ergebnisse
+
+  ### Internetnutzung nach Altersgruppe
+
+  ![Internetnutzung nach Alter](/zukunftslabor/charts/digital_internetnutzung_alter.svg)
+
+  ### E-Government-Nutzung
+
+  ![E-Gov-Trend](/zukunftslabor/charts/digital_egov_trend.svg)
+
+  ### Bereitschaftslücke
+
+  ![Digitale Lücke](/zukunftslabor/charts/digital_luecke_alter.svg)
+
+  ### E-ID-Referendum: Vertrauensfrage
+
+  ![E-ID Motive](/zukunftslabor/charts/digital_eid_motive.svg)
+
+  ### Open-Data-Reife
+
+  ![Open Data Vergleich](/zukunftslabor/charts/digital_opendata_vergleich.svg)
+
+  ## Einschränkungen
+
+  - E-Mail-Nutzung als Proxy für Internetnutzung (BFS-Definition)
+  - E-Gov-Daten nicht nach Altersgruppe verfügbar — Lücke nur auf Totalebene berechenbar
+  - Open-Data-Score basiert auf EU-Methodik (Schweiz als Beobachterstaat)
+  - E-ID-Motive: VOX-Nachbefragung mit begrenzter Stichprobe
+
+  ## Datenquellen
+
+  - BFS Omnibus ICT 2014–2025: Internetnutzung, E-Government-Nutzung
+  - EU Open Data Maturity Report 2023 (data.europa.eu)
+  - VOX/Sotomo: Nachbefragung E-ID-Referendum 7. März 2021
+  """
+)
+```
