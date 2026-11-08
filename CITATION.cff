@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "Wenn du Daten oder Analysen des Zukunftslabors verwendest, zitiere sie bitte so. / Please cite the Future Lab like this."
+title: "Zukunftslabor: Daten, Modelle und Analysen von Die Zukunft"
+type: dataset
+authors:
+  - name: "Die Zukunft, Zukunftslabor"
+    website: "https://die-zukunft.ch/zukunftslabor/"
+repository-code: "https://github.com/zukunft-ch/zukunftslabor"
+url: "https://die-zukunft.ch/zukunftslabor/"
+license: CC-BY-4.0
+keywords:
+  - Switzerland
+  - open data
+  - policy analysis
+  - artificial intelligence
+  - basic income
+  - robotics
+  - e-government
+abstract: >-
+  Offene Forschungswerkstatt der Schweizer Partei Die Zukunft: Datensätze (CSV), Diagramm-Spezifikationen
+  (Vega-Lite), Livebook-Notebooks und Datenbriefings hinter den Notizen und dem Zukunftsmonitor auf
+  die-zukunft.ch. Texte, Daten und Diagramme CC BY 4.0, Code MIT.

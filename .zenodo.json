@@ -1,0 +1,10 @@
+{
+  "title": "Zukunftslabor: Daten, Modelle und Analysen von Die Zukunft",
+  "upload_type": "dataset",
+  "description": "Offene Forschungswerkstatt der Schweizer Partei Die Zukunft: Datensätze (CSV), Diagramm-Spezifikationen (Vega-Lite), Livebook-Notebooks und Datenbriefings hinter den Notizen und dem Zukunftsmonitor auf https://die-zukunft.ch/zukunftslabor/. Texte, Daten und Diagramme CC BY 4.0, Code MIT.",
+  "creators": [{ "name": "Die Zukunft, Zukunftslabor" }],
+  "license": "cc-by-4.0",
+  "keywords": ["Switzerland", "open data", "policy analysis", "artificial intelligence", "basic income", "robotics", "e-government"],
+  "related_identifiers": [{ "identifier": "https://die-zukunft.ch/zukunftslabor/", "relation": "isDocumentedBy", "scheme": "url" }],
+  "language": "deu"
+}
