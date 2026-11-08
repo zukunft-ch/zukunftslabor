@@ -229,10 +229,11 @@ chart_szenarien =
 
 ```elixir
 # Europäische Spotpreise: ~EUR 80–100/MWh (Durchschnitt 2023–2024)
-# CHF/EUR: ~0.95
+# Wechselkurs: 1 EUR ≈ 0.95 CHF (Annahme; Ende 2026 eher ~0.93)
 eur_spot_price = 90  # EUR/MWh
 chf_per_eur = 0.95
-chf_per_mwh = eur_spot_price / chf_per_eur
+# Korrigiert 2026-11-08: EUR → CHF wird multipliziert (vorher fälschlich dividiert)
+chf_per_mwh = eur_spot_price * chf_per_eur
 
 cost_data =
   Enum.map(scenarios, fn s ->

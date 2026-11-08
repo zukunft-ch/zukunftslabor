@@ -97,9 +97,8 @@ charts = ["chart1.svg"]     # optional
 - Pragmatic, evidence-based, Swiss-serious
 - No "free money" framing for UBI — use "stability", "foundation"
 - No sci-fi vibes — measurable claims backed by data
-- Chart colors: Purple `#a855f7`, Blue `#3b82f6`, Teal `#06b6d4`
-- Font in charts: Switzer (matches website)
-- Chart width: 720px (matches `container--narrow`)
+- Chart style is NOT set per spec: the site applies one house style (Alpenglühen palette, mono axes, Swiss highlight) via `die-zukunft.ch/themes/avenir/static/js/dz-charts.js`; static SVG fallbacks come from `scripts/render_charts.mjs` using the same file. Specs only need data, encodings and a German title.
+- Every published note carries `[extra.review]` and `[[extra.changelog]]` (see the site's `.claude/rules/technical.md`).
 
 ## BFS PxWeb API notes
 - Base URL: `https://www.pxweb.bfs.admin.ch/api/v1`
