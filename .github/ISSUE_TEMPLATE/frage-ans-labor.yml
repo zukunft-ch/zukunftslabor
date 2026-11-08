@@ -1,0 +1,21 @@
+name: Frage ans Labor / Question for the Lab
+description: Schlag eine Frage vor, die das Zukunftslabor mit Daten beantworten soll.
+labels: ["frage"]
+body:
+  - type: textarea
+    id: frage
+    attributes:
+      label: Welche Frage soll das Labor beantworten?
+      description: Möglichst konkret und messbar. Beispiel «Wie viele Baubewilligungen dauern in welchem Kanton länger als 6 Monate?»
+    validations:
+      required: true
+  - type: textarea
+    id: daten
+    attributes:
+      label: Kennst du Datenquellen dafür?
+      description: BFS-Tabellen, Studien, Statistiken (Links genügen).
+  - type: dropdown
+    id: pfeiler
+    attributes:
+      label: Zu welchem Pfeiler gehört die Frage?
+      options: [Souveräne KI & Rechenkraft, Digitale Souveränität, Reindustrialisierung mit Robotik, Arbeit ohne Angst, Life Science & Gesundheit, Grundeinkommen, Städte & Wohnen, Forschung Innovation & Commons, Energie & Infrastruktur-Resilienz, Offener Staat, Neutralität & Frieden, Talent Integration & Rechtsstaat, Sprache & Verständigung, Weiss nicht]

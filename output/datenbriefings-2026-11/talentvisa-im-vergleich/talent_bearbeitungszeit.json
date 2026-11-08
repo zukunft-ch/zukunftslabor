@@ -1,0 +1,75 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "config": {
+    "font": "Switzer, system-ui, sans-serif",
+    "view": {
+      "stroke": "transparent"
+    }
+  },
+  "data": {
+    "values": [
+      {
+        "Programm": "Ziel Die Zukunft (10 Arbeitstage)",
+        "Wochen": 2,
+        "Grundlage": "Programmziel"
+      },
+      {
+        "Programm": "Singapur: ONE Pass",
+        "Wochen": 4,
+        "Grundlage": "«within 4 weeks for most cases» (MOM)"
+      },
+      {
+        "Programm": "Hongkong: Top Talent Pass",
+        "Wochen": 4,
+        "Grundlage": "normalerweise rund 4 Wochen (ImmD)"
+      },
+      {
+        "Programm": "UK: Global Talent",
+        "Wochen": 8,
+        "Grundlage": "Endorsement 2–5 Wochen + Visum rund 3 Wochen (GOV.UK)"
+      },
+      {
+        "Programm": "Schweiz: Drittstaaten-Bewilligung",
+        "Wochen": 8,
+        "Grundlage": "in der Regel 6–8 Wochen (SEM)"
+      }
+    ]
+  },
+  "encoding": {
+    "y": {
+      "field": "Programm",
+      "type": "nominal",
+      "title": null,
+      "sort": null
+    },
+    "x": {
+      "field": "Wochen",
+      "type": "quantitative",
+      "title": "Wochen",
+      "scale": {
+        "domain": [
+          0,
+          10
+        ]
+      }
+    },
+    "tooltip": [
+      {
+        "field": "Programm"
+      },
+      {
+        "field": "Wochen"
+      },
+      {
+        "field": "Grundlage"
+      }
+    ]
+  },
+  "height": 260,
+  "mark": {
+    "type": "bar",
+    "cornerRadiusEnd": 4
+  },
+  "title": "Richtwert für die Bearbeitungsdauer (obere Grenze, Wochen)",
+  "width": 720
+}

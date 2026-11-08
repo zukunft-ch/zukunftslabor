@@ -1,0 +1,46 @@
+chart,Jahr,Rang,EGDI,Land,Teilindex,Wert,Komponente
+egov_rang_verlauf,2018,15,0.85,,,,
+egov_rang_verlauf,2020,16,0.8907,,,,
+egov_rang_verlauf,2022,23,0.8752,,,,
+egov_rang_verlauf,2024,26,0.9004,,,,
+egov_teilindizes_2024,,,,Schweiz,Online-Dienste (OSI),0.8408,
+egov_teilindizes_2024,,,,Schweiz,Telekom-Infrastruktur (TII),0.9576,
+egov_teilindizes_2024,,,,Schweiz,Humankapital (HCI),0.9026,
+egov_teilindizes_2024,,,,Dänemark,Online-Dienste (OSI),0.9992,
+egov_teilindizes_2024,,,,Dänemark,Telekom-Infrastruktur (TII),0.9966,
+egov_teilindizes_2024,,,,Dänemark,Humankapital (HCI),0.9584,
+egov_teilindizes_2024,,,,Estland,Online-Dienste (OSI),0.9954,
+egov_teilindizes_2024,,,,Estland,Telekom-Infrastruktur (TII),0.9731,
+egov_teilindizes_2024,,,,Estland,Humankapital (HCI),0.9497,
+egov_teilindizes_2024,,,,Südkorea,Online-Dienste (OSI),1.0,
+egov_teilindizes_2024,,,,Südkorea,Telekom-Infrastruktur (TII),0.9917,
+egov_teilindizes_2024,,,,Südkorea,Humankapital (HCI),0.912,
+egov_teilindizes_2024,,,,Singapur,Online-Dienste (OSI),0.9831,
+egov_teilindizes_2024,,,,Singapur,Telekom-Infrastruktur (TII),0.9881,
+egov_teilindizes_2024,,,,Singapur,Humankapital (HCI),0.9362,
+egov_teilindizes_2024,,,,Deutschland,Online-Dienste (OSI),0.9238,
+egov_teilindizes_2024,,,,Deutschland,Telekom-Infrastruktur (TII),0.9236,
+egov_teilindizes_2024,,,,Deutschland,Humankapital (HCI),0.9672,
+egov_teilindizes_2024,,,,Österreich,Online-Dienste (OSI),0.8383,
+egov_teilindizes_2024,,,,Österreich,Telekom-Infrastruktur (TII),0.981,
+egov_teilindizes_2024,,,,Österreich,Humankapital (HCI),0.9003,
+egov_osi_komponenten_2024,,,,Schweiz,,1.0,Institutioneller Rahmen
+egov_osi_komponenten_2024,,,,Schweiz,,0.8072,Dienstangebot
+egov_osi_komponenten_2024,,,,Schweiz,,0.8889,Inhalte
+egov_osi_komponenten_2024,,,,Schweiz,,0.8219,E-Partizipation
+egov_osi_komponenten_2024,,,,Schweiz,,0.625,Technologie
+egov_osi_komponenten_2024,,,,Dänemark,,1.0,Institutioneller Rahmen
+egov_osi_komponenten_2024,,,,Dänemark,,0.988,Dienstangebot
+egov_osi_komponenten_2024,,,,Dänemark,,1.0,Inhalte
+egov_osi_komponenten_2024,,,,Dänemark,,0.9863,E-Partizipation
+egov_osi_komponenten_2024,,,,Dänemark,,0.875,Technologie
+egov_osi_komponenten_2024,,,,Estland,,1.0,Institutioneller Rahmen
+egov_osi_komponenten_2024,,,,Estland,,1.0,Dienstangebot
+egov_osi_komponenten_2024,,,,Estland,,1.0,Inhalte
+egov_osi_komponenten_2024,,,,Estland,,0.9589,E-Partizipation
+egov_osi_komponenten_2024,,,,Estland,,0.875,Technologie
+egov_osi_komponenten_2024,,,,Deutschland,,1.0,Institutioneller Rahmen
+egov_osi_komponenten_2024,,,,Deutschland,,0.8434,Dienstangebot
+egov_osi_komponenten_2024,,,,Deutschland,,0.8889,Inhalte
+egov_osi_komponenten_2024,,,,Deutschland,,0.9726,E-Partizipation
+egov_osi_komponenten_2024,,,,Deutschland,,0.875,Technologie

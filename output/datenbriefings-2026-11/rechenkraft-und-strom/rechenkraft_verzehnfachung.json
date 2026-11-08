@@ -1,0 +1,76 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "config": {
+    "font": "Switzer, system-ui, sans-serif",
+    "view": {
+      "stroke": "transparent"
+    }
+  },
+  "data": {
+    "values": [
+      {
+        "Posten": "Alps heute (Linpack-Messung, Dauerbetrieb)",
+        "Art": "Schätzung",
+        "TWh": 0.062,
+        "order": 0
+      },
+      {
+        "Posten": "10× Alps, nur IT-Last",
+        "Art": "Schätzung",
+        "TWh": 0.62,
+        "order": 1
+      },
+      {
+        "Posten": "10× Alps, inkl. Kühlung (PUE 1,3 angenommen)",
+        "Art": "Schätzung",
+        "TWh": 0.81,
+        "order": 2
+      },
+      {
+        "Posten": "Alle Rechenzentren 2024",
+        "Art": "BFE-Messung",
+        "TWh": 2.1,
+        "order": 3
+      },
+      {
+        "Posten": "Zuwachs Rechenzentren 2024–2030 (hohes Szenario)",
+        "Art": "BFE-Szenario",
+        "TWh": 1.1,
+        "order": 4
+      }
+    ]
+  },
+  "encoding": {
+    "x": {
+      "field": "TWh",
+      "type": "quantitative",
+      "title": "TWh pro Jahr"
+    },
+    "y": {
+      "field": "Posten",
+      "type": "nominal",
+      "sort": {
+        "field": "order"
+      },
+      "title": null
+    },
+    "tooltip": [
+      {
+        "field": "Posten",
+        "type": "nominal"
+      },
+      {
+        "field": "TWh",
+        "type": "quantitative",
+        "format": ",.2~f"
+      }
+    ]
+  },
+  "height": 300,
+  "mark": {
+    "type": "bar",
+    "cornerRadiusEnd": 4
+  },
+  "title": "Öffentliche Rechenkraft verzehnfachen: Strombedarf im Vergleich (TWh pro Jahr)",
+  "width": 720
+}

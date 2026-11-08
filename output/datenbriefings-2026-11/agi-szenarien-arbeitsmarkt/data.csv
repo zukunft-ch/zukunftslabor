@@ -1,0 +1,14 @@
+chart,kategorie,wert_a (2010 Tsd. / Wahrscheinlichkeit),wert_b (2025 Tsd. / Jahr),veraenderung_tsd,quelle
+agi_berufe_2025,Intellektuelle und wissenschaftliche Berufe,958.7,1298.6,339.9,BFS SAKE T 03.02.01.21
+agi_berufe_2025,Techniker/innen und gleichrangige Berufe,598.5,843.7,245.2,BFS SAKE T 03.02.01.21
+agi_berufe_2025,Dienstleistungsberufe und Verkauf,603.0,640.5,37.5,BFS SAKE T 03.02.01.21
+agi_berufe_2025,Bürokräfte und verwandte Berufe,624.4,570.6,-53.8,BFS SAKE T 03.02.01.21
+agi_berufe_2025,Handwerks- und verwandte Berufe,554.0,436.2,-117.8,BFS SAKE T 03.02.01.21
+agi_berufe_2025,Führungskräfte,266.9,426.6,159.7,BFS SAKE T 03.02.01.21
+agi_berufe_2025,Hilfsarbeitskräfte,252.5,285.6,33.1,BFS SAKE T 03.02.01.21
+agi_berufe_2025,"Anlagen- und Maschinenbedienung, Montage",189.5,176.1,-13.4,BFS SAKE T 03.02.01.21
+agi_berufe_2025,"Land- und Forstwirtschaft, Fischerei",135.5,97.2,-38.3,BFS SAKE T 03.02.01.21
+agi_zeithorizonte,Alle Aufgaben besser als Menschen (HLMI),10 %,2027,,"Grace et al. 2025, JAIR 84"
+agi_zeithorizonte,Alle Aufgaben besser als Menschen (HLMI),50 %,2047,,"Grace et al. 2025, JAIR 84"
+agi_zeithorizonte,Alle Berufe vollständig automatisierbar (FAOL),10 %,2037,,"Grace et al. 2025, JAIR 84"
+agi_zeithorizonte,Alle Berufe vollständig automatisierbar (FAOL),50 %,2116,,"Grace et al. 2025, JAIR 84"

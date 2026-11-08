@@ -1,0 +1,326 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "config": {
+    "font": "Switzer, system-ui, sans-serif",
+    "view": {
+      "stroke": "transparent"
+    }
+  },
+  "data": {
+    "values": [
+      {
+        "Jahr": 2019,
+        "Ergebnis": "vollständig gewährt",
+        "Anteil": 59,
+        "Reihenfolge": 0
+      },
+      {
+        "Jahr": 2019,
+        "Ergebnis": "teilweise gewährt/aufgeschoben",
+        "Anteil": 19,
+        "Reihenfolge": 1
+      },
+      {
+        "Jahr": 2019,
+        "Ergebnis": "vollständig verweigert",
+        "Anteil": 9,
+        "Reihenfolge": 2
+      },
+      {
+        "Jahr": 2019,
+        "Ergebnis": "zurückgezogen",
+        "Anteil": 4,
+        "Reihenfolge": 3
+      },
+      {
+        "Jahr": 2019,
+        "Ergebnis": "hängig",
+        "Anteil": 5,
+        "Reihenfolge": 4
+      },
+      {
+        "Jahr": 2019,
+        "Ergebnis": "kein amtliches Dokument",
+        "Anteil": 4,
+        "Reihenfolge": 5
+      },
+      {
+        "Jahr": 2020,
+        "Ergebnis": "vollständig gewährt",
+        "Anteil": 51,
+        "Reihenfolge": 0
+      },
+      {
+        "Jahr": 2020,
+        "Ergebnis": "teilweise gewährt/aufgeschoben",
+        "Anteil": 24,
+        "Reihenfolge": 1
+      },
+      {
+        "Jahr": 2020,
+        "Ergebnis": "vollständig verweigert",
+        "Anteil": 9,
+        "Reihenfolge": 2
+      },
+      {
+        "Jahr": 2020,
+        "Ergebnis": "zurückgezogen",
+        "Anteil": 3,
+        "Reihenfolge": 3
+      },
+      {
+        "Jahr": 2020,
+        "Ergebnis": "hängig",
+        "Anteil": 7,
+        "Reihenfolge": 4
+      },
+      {
+        "Jahr": 2020,
+        "Ergebnis": "kein amtliches Dokument",
+        "Anteil": 6,
+        "Reihenfolge": 5
+      },
+      {
+        "Jahr": 2021,
+        "Ergebnis": "vollständig gewährt",
+        "Anteil": 50,
+        "Reihenfolge": 0
+      },
+      {
+        "Jahr": 2021,
+        "Ergebnis": "teilweise gewährt/aufgeschoben",
+        "Anteil": 23,
+        "Reihenfolge": 1
+      },
+      {
+        "Jahr": 2021,
+        "Ergebnis": "vollständig verweigert",
+        "Anteil": 9,
+        "Reihenfolge": 2
+      },
+      {
+        "Jahr": 2021,
+        "Ergebnis": "zurückgezogen",
+        "Anteil": 4,
+        "Reihenfolge": 3
+      },
+      {
+        "Jahr": 2021,
+        "Ergebnis": "hängig",
+        "Anteil": 6,
+        "Reihenfolge": 4
+      },
+      {
+        "Jahr": 2021,
+        "Ergebnis": "kein amtliches Dokument",
+        "Anteil": 8,
+        "Reihenfolge": 5
+      },
+      {
+        "Jahr": 2022,
+        "Ergebnis": "vollständig gewährt",
+        "Anteil": 53,
+        "Reihenfolge": 0
+      },
+      {
+        "Jahr": 2022,
+        "Ergebnis": "teilweise gewährt/aufgeschoben",
+        "Anteil": 20,
+        "Reihenfolge": 1
+      },
+      {
+        "Jahr": 2022,
+        "Ergebnis": "vollständig verweigert",
+        "Anteil": 8,
+        "Reihenfolge": 2
+      },
+      {
+        "Jahr": 2022,
+        "Ergebnis": "zurückgezogen",
+        "Anteil": 5,
+        "Reihenfolge": 3
+      },
+      {
+        "Jahr": 2022,
+        "Ergebnis": "hängig",
+        "Anteil": 6,
+        "Reihenfolge": 4
+      },
+      {
+        "Jahr": 2022,
+        "Ergebnis": "kein amtliches Dokument",
+        "Anteil": 8,
+        "Reihenfolge": 5
+      },
+      {
+        "Jahr": 2023,
+        "Ergebnis": "vollständig gewährt",
+        "Anteil": 48,
+        "Reihenfolge": 0
+      },
+      {
+        "Jahr": 2023,
+        "Ergebnis": "teilweise gewährt/aufgeschoben",
+        "Anteil": 23,
+        "Reihenfolge": 1
+      },
+      {
+        "Jahr": 2023,
+        "Ergebnis": "vollständig verweigert",
+        "Anteil": 10,
+        "Reihenfolge": 2
+      },
+      {
+        "Jahr": 2023,
+        "Ergebnis": "zurückgezogen",
+        "Anteil": 4,
+        "Reihenfolge": 3
+      },
+      {
+        "Jahr": 2023,
+        "Ergebnis": "hängig",
+        "Anteil": 6,
+        "Reihenfolge": 4
+      },
+      {
+        "Jahr": 2023,
+        "Ergebnis": "kein amtliches Dokument",
+        "Anteil": 9,
+        "Reihenfolge": 5
+      },
+      {
+        "Jahr": 2024,
+        "Ergebnis": "vollständig gewährt",
+        "Anteil": 52,
+        "Reihenfolge": 0
+      },
+      {
+        "Jahr": 2024,
+        "Ergebnis": "teilweise gewährt/aufgeschoben",
+        "Anteil": 21,
+        "Reihenfolge": 1
+      },
+      {
+        "Jahr": 2024,
+        "Ergebnis": "vollständig verweigert",
+        "Anteil": 8,
+        "Reihenfolge": 2
+      },
+      {
+        "Jahr": 2024,
+        "Ergebnis": "zurückgezogen",
+        "Anteil": 6,
+        "Reihenfolge": 3
+      },
+      {
+        "Jahr": 2024,
+        "Ergebnis": "hängig",
+        "Anteil": 5,
+        "Reihenfolge": 4
+      },
+      {
+        "Jahr": 2024,
+        "Ergebnis": "kein amtliches Dokument",
+        "Anteil": 8,
+        "Reihenfolge": 5
+      },
+      {
+        "Jahr": 2025,
+        "Ergebnis": "vollständig gewährt",
+        "Anteil": 39,
+        "Reihenfolge": 0
+      },
+      {
+        "Jahr": 2025,
+        "Ergebnis": "teilweise gewährt/aufgeschoben",
+        "Anteil": 25,
+        "Reihenfolge": 1
+      },
+      {
+        "Jahr": 2025,
+        "Ergebnis": "vollständig verweigert",
+        "Anteil": 10,
+        "Reihenfolge": 2
+      },
+      {
+        "Jahr": 2025,
+        "Ergebnis": "zurückgezogen",
+        "Anteil": 4,
+        "Reihenfolge": 3
+      },
+      {
+        "Jahr": 2025,
+        "Ergebnis": "hängig",
+        "Anteil": 9,
+        "Reihenfolge": 4
+      },
+      {
+        "Jahr": 2025,
+        "Ergebnis": "kein amtliches Dokument",
+        "Anteil": 13,
+        "Reihenfolge": 5
+      }
+    ]
+  },
+  "encoding": {
+    "x": {
+      "field": "Jahr",
+      "type": "ordinal",
+      "title": "Jahr",
+      "axis": {
+        "labelAngle": 0
+      }
+    },
+    "y": {
+      "field": "Anteil",
+      "type": "quantitative",
+      "title": "Anteil (%)",
+      "stack": "zero",
+      "scale": {
+        "domain": [
+          0,
+          100
+        ]
+      }
+    },
+    "color": {
+      "field": "Ergebnis",
+      "type": "nominal",
+      "title": null,
+      "sort": [
+        "vollständig gewährt",
+        "teilweise gewährt/aufgeschoben",
+        "vollständig verweigert",
+        "zurückgezogen",
+        "hängig",
+        "kein amtliches Dokument"
+      ],
+      "legend": {
+        "orient": "bottom",
+        "columns": 3
+      }
+    },
+    "order": {
+      "field": "Reihenfolge",
+      "type": "quantitative"
+    },
+    "tooltip": [
+      {
+        "field": "Jahr"
+      },
+      {
+        "field": "Ergebnis"
+      },
+      {
+        "field": "Anteil",
+        "title": "Anteil (%)"
+      }
+    ]
+  },
+  "height": 360,
+  "mark": {
+    "type": "bar"
+  },
+  "title": "Ausgang der Zugangsgesuche, 2019–2025 (Anteil in %)",
+  "width": 720
+}

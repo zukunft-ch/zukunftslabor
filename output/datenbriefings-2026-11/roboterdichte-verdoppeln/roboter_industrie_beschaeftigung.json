@@ -1,0 +1,223 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "config": {
+    "font": "Switzer, system-ui, sans-serif",
+    "view": {
+      "stroke": "transparent"
+    }
+  },
+  "data": {
+    "values": [
+      {
+        "Jahr": 1991,
+        "Erwerbstätige": 797.6,
+        "Anteil": 21.2
+      },
+      {
+        "Jahr": 1992,
+        "Erwerbstätige": 755.6,
+        "Anteil": 20.1
+      },
+      {
+        "Jahr": 1993,
+        "Erwerbstätige": 708.2,
+        "Anteil": 18.9
+      },
+      {
+        "Jahr": 1994,
+        "Erwerbstätige": 711.3,
+        "Anteil": 19.1
+      },
+      {
+        "Jahr": 1995,
+        "Erwerbstätige": 739.5,
+        "Anteil": 19.7
+      },
+      {
+        "Jahr": 1996,
+        "Erwerbstätige": 708.0,
+        "Anteil": 18.7
+      },
+      {
+        "Jahr": 1997,
+        "Erwerbstätige": 678.7,
+        "Anteil": 18.0
+      },
+      {
+        "Jahr": 1998,
+        "Erwerbstätige": 681.3,
+        "Anteil": 17.8
+      },
+      {
+        "Jahr": 1999,
+        "Erwerbstätige": 674.9,
+        "Anteil": 17.5
+      },
+      {
+        "Jahr": 2000,
+        "Erwerbstätige": 681.5,
+        "Anteil": 17.6
+      },
+      {
+        "Jahr": 2001,
+        "Erwerbstätige": 696.2,
+        "Anteil": 17.7
+      },
+      {
+        "Jahr": 2002,
+        "Erwerbstätige": 681.0,
+        "Anteil": 17.2
+      },
+      {
+        "Jahr": 2003,
+        "Erwerbstätige": 652.0,
+        "Anteil": 16.5
+      },
+      {
+        "Jahr": 2004,
+        "Erwerbstätige": 633.7,
+        "Anteil": 16.0
+      },
+      {
+        "Jahr": 2005,
+        "Erwerbstätige": 633.8,
+        "Anteil": 15.9
+      },
+      {
+        "Jahr": 2006,
+        "Erwerbstätige": 645.2,
+        "Anteil": 15.9
+      },
+      {
+        "Jahr": 2007,
+        "Erwerbstätige": 660.2,
+        "Anteil": 16.0
+      },
+      {
+        "Jahr": 2008,
+        "Erwerbstätige": 675.0,
+        "Anteil": 16.0
+      },
+      {
+        "Jahr": 2009,
+        "Erwerbstätige": 669.6,
+        "Anteil": 15.7
+      },
+      {
+        "Jahr": 2010,
+        "Erwerbstätige": 643.9,
+        "Anteil": 15.3
+      },
+      {
+        "Jahr": 2011,
+        "Erwerbstätige": 647.2,
+        "Anteil": 15.1
+      },
+      {
+        "Jahr": 2012,
+        "Erwerbstätige": 634.0,
+        "Anteil": 14.6
+      },
+      {
+        "Jahr": 2013,
+        "Erwerbstätige": 644.6,
+        "Anteil": 14.7
+      },
+      {
+        "Jahr": 2014,
+        "Erwerbstätige": 645.4,
+        "Anteil": 14.4
+      },
+      {
+        "Jahr": 2015,
+        "Erwerbstätige": 631.3,
+        "Anteil": 13.9
+      },
+      {
+        "Jahr": 2016,
+        "Erwerbstätige": 634.6,
+        "Anteil": 13.8
+      },
+      {
+        "Jahr": 2017,
+        "Erwerbstätige": 632.8,
+        "Anteil": 13.6
+      },
+      {
+        "Jahr": 2018,
+        "Erwerbstätige": 637.3,
+        "Anteil": 13.6
+      },
+      {
+        "Jahr": 2019,
+        "Erwerbstätige": 649.6,
+        "Anteil": 13.8
+      },
+      {
+        "Jahr": 2020,
+        "Erwerbstätige": 645.2,
+        "Anteil": 13.7
+      },
+      {
+        "Jahr": 2021,
+        "Erwerbstätige": 622.6,
+        "Anteil": 13.2
+      },
+      {
+        "Jahr": 2022,
+        "Erwerbstätige": 629.0,
+        "Anteil": 13.2
+      },
+      {
+        "Jahr": 2023,
+        "Erwerbstätige": 638.7,
+        "Anteil": 13.2
+      },
+      {
+        "Jahr": 2024,
+        "Erwerbstätige": 639.0,
+        "Anteil": 13.1
+      },
+      {
+        "Jahr": 2025,
+        "Erwerbstätige": 633.6,
+        "Anteil": 13.0
+      }
+    ]
+  },
+  "encoding": {
+    "x": {
+      "field": "Jahr",
+      "type": "quantitative",
+      "title": null,
+      "axis": {
+        "format": "d"
+      }
+    },
+    "y": {
+      "field": "Erwerbstätige",
+      "type": "quantitative",
+      "title": "Erwerbstätige (in 1000)",
+      "scale": {
+        "zero": false
+      }
+    },
+    "tooltip": [
+      {
+        "field": "Jahr"
+      },
+      {
+        "field": "Erwerbstätige",
+        "type": "quantitative"
+      }
+    ]
+  },
+  "height": 320,
+  "mark": {
+    "type": "line",
+    "point": true,
+    "strokeWidth": 2
+  },
+  "title": "Erwerbstätige in Industrie und Bergbau (Abschnitte B–E), in 1000",
+  "width": 720
+}

@@ -1,0 +1,16 @@
+chart,kategorie,art,twh,quelle
+rechenkraft_rechenzentren_strom,2019,Messung (Systemgrenze 2026),1.77,BFE/EnergieSchweiz 2026
+rechenkraft_rechenzentren_strom,2024,Messung,2.1,BFE/EnergieSchweiz 2026
+rechenkraft_rechenzentren_strom,2030 tief,Szenario,2.5,BFE/EnergieSchweiz 2026
+rechenkraft_rechenzentren_strom,2030 hoch,Szenario,3.2,BFE/EnergieSchweiz 2026
+rechenkraft_rechenzentren_strom,2030 Maximum,Szenario,3.5,BFE/EnergieSchweiz 2026
+rechenkraft_landeserzeugung,Wasserkraft,"Anteil 55,5 %",37.5,BFE Elektrizitätsbilanz 2025
+rechenkraft_landeserzeugung,Kernenergie,"Anteil 27,2 %",18.4,BFE Elektrizitätsbilanz 2025
+rechenkraft_landeserzeugung,Photovoltaik,"Anteil 11,8 %",8.0,BFE Elektrizitätsbilanz 2025
+rechenkraft_landeserzeugung,Thermische Kraftwerke,"Anteil 5,3 %",3.6,BFE Elektrizitätsbilanz 2025
+rechenkraft_landeserzeugung,Wind,"Anteil 0,2 %",0.1,BFE Elektrizitätsbilanz 2025
+rechenkraft_verzehnfachung,"Alps heute (Linpack-Messung, Dauerbetrieb)",Schätzung,0.062,TOP500 (Alps 7'124 kW) / BFE; eigene Rechnung
+rechenkraft_verzehnfachung,"10× Alps, nur IT-Last",Schätzung,0.62,TOP500 (Alps 7'124 kW) / BFE; eigene Rechnung
+rechenkraft_verzehnfachung,"10× Alps, inkl. Kühlung (PUE 1,3 angenommen)",Schätzung,0.81,TOP500 (Alps 7'124 kW) / BFE; eigene Rechnung
+rechenkraft_verzehnfachung,Alle Rechenzentren 2024,BFE-Messung,2.1,TOP500 (Alps 7'124 kW) / BFE; eigene Rechnung
+rechenkraft_verzehnfachung,Zuwachs Rechenzentren 2024–2030 (hohes Szenario),BFE-Szenario,1.1,TOP500 (Alps 7'124 kW) / BFE; eigene Rechnung

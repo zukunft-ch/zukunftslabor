@@ -1,0 +1,176 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "config": {
+    "font": "Switzer, system-ui, sans-serif",
+    "view": {
+      "stroke": "transparent"
+    }
+  },
+  "data": {
+    "values": [
+      {
+        "Land": "Schweiz",
+        "Teilindex": "Online-Dienste (OSI)",
+        "Wert": 0.8408
+      },
+      {
+        "Land": "Schweiz",
+        "Teilindex": "Telekom-Infrastruktur (TII)",
+        "Wert": 0.9576
+      },
+      {
+        "Land": "Schweiz",
+        "Teilindex": "Humankapital (HCI)",
+        "Wert": 0.9026
+      },
+      {
+        "Land": "Dänemark",
+        "Teilindex": "Online-Dienste (OSI)",
+        "Wert": 0.9992
+      },
+      {
+        "Land": "Dänemark",
+        "Teilindex": "Telekom-Infrastruktur (TII)",
+        "Wert": 0.9966
+      },
+      {
+        "Land": "Dänemark",
+        "Teilindex": "Humankapital (HCI)",
+        "Wert": 0.9584
+      },
+      {
+        "Land": "Estland",
+        "Teilindex": "Online-Dienste (OSI)",
+        "Wert": 0.9954
+      },
+      {
+        "Land": "Estland",
+        "Teilindex": "Telekom-Infrastruktur (TII)",
+        "Wert": 0.9731
+      },
+      {
+        "Land": "Estland",
+        "Teilindex": "Humankapital (HCI)",
+        "Wert": 0.9497
+      },
+      {
+        "Land": "Südkorea",
+        "Teilindex": "Online-Dienste (OSI)",
+        "Wert": 1.0
+      },
+      {
+        "Land": "Südkorea",
+        "Teilindex": "Telekom-Infrastruktur (TII)",
+        "Wert": 0.9917
+      },
+      {
+        "Land": "Südkorea",
+        "Teilindex": "Humankapital (HCI)",
+        "Wert": 0.912
+      },
+      {
+        "Land": "Singapur",
+        "Teilindex": "Online-Dienste (OSI)",
+        "Wert": 0.9831
+      },
+      {
+        "Land": "Singapur",
+        "Teilindex": "Telekom-Infrastruktur (TII)",
+        "Wert": 0.9881
+      },
+      {
+        "Land": "Singapur",
+        "Teilindex": "Humankapital (HCI)",
+        "Wert": 0.9362
+      },
+      {
+        "Land": "Deutschland",
+        "Teilindex": "Online-Dienste (OSI)",
+        "Wert": 0.9238
+      },
+      {
+        "Land": "Deutschland",
+        "Teilindex": "Telekom-Infrastruktur (TII)",
+        "Wert": 0.9236
+      },
+      {
+        "Land": "Deutschland",
+        "Teilindex": "Humankapital (HCI)",
+        "Wert": 0.9672
+      },
+      {
+        "Land": "Österreich",
+        "Teilindex": "Online-Dienste (OSI)",
+        "Wert": 0.8383
+      },
+      {
+        "Land": "Österreich",
+        "Teilindex": "Telekom-Infrastruktur (TII)",
+        "Wert": 0.981
+      },
+      {
+        "Land": "Österreich",
+        "Teilindex": "Humankapital (HCI)",
+        "Wert": 0.9003
+      }
+    ]
+  },
+  "encoding": {
+    "y": {
+      "field": "Land",
+      "type": "nominal",
+      "title": null,
+      "sort": [
+        "Dänemark",
+        "Estland",
+        "Singapur",
+        "Südkorea",
+        "Deutschland",
+        "Österreich",
+        "Schweiz"
+      ]
+    },
+    "yOffset": {
+      "field": "Teilindex",
+      "type": "nominal"
+    },
+    "x": {
+      "field": "Wert",
+      "type": "quantitative",
+      "title": "Indexwert",
+      "scale": {
+        "domain": [
+          0.6,
+          1.0
+        ]
+      }
+    },
+    "color": {
+      "field": "Teilindex",
+      "type": "nominal",
+      "title": null,
+      "legend": {
+        "orient": "bottom"
+      }
+    },
+    "tooltip": [
+      {
+        "field": "Land"
+      },
+      {
+        "field": "Teilindex"
+      },
+      {
+        "field": "Wert",
+        "format": ".3f"
+      }
+    ]
+  },
+  "height": 460,
+  "mark": {
+    "type": "bar",
+    "cornerRadiusEnd": 3
+  },
+  "title": "EGDI-Teilindizes 2024 im Vergleich (0–1)",
+  "width": 720
+}

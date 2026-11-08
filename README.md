@@ -1,5 +1,18 @@
 # Zukunftslabor
 
+**Die offene Forschungswerkstatt von [Die Zukunft](https://die-zukunft.ch).** Jede Notiz auf
+[die-zukunft.ch/zukunftslabor](https://die-zukunft.ch/zukunftslabor/) lässt sich hier nachrechnen:
+Datenquellen, Code, Diagramme. Texte und Daten stehen unter CC BY 4.0, Code unter MIT (siehe `LICENSE.md`).
+
+- **Zitieren:** Die Zukunft, Zukunftslabor (Jahr): «Titel der Notiz». URL der Notiz. CC BY 4.0.
+- **Frage vorschlagen:** [Neues Issue «Frage ans Labor»](https://github.com/zukunft-ch/zukunftslabor/issues/new?template=frage-ans-labor.yml)
+- **Fehler melden:** [Neues Issue «Korrektur»](https://github.com/zukunft-ch/zukunftslabor/issues/new?template=korrektur.yml). Korrekturen werden auf der Website öffentlich vermerkt.
+- **Zukunftsmonitor:** die Indikatoren hinter unseren Zielen, als [monitor.json](https://die-zukunft.ch/zukunftslabor/monitor.json).
+- `output/datenbriefings-2026-11/`: Daten (CSV), Diagramm-Spezifikationen (Vega-Lite) und Texte der Notizen vom November 2026; `scripts/render_charts.mjs` rendert die statischen SVG-Fallbacks im Website-Design.
+
+---
+
+
 Evidence-based research pipeline for [Die Zukunft](https://die-zukunft.ch) policy analysis. Fetches Swiss federal data, runs analysis in LiveBook notebooks, and produces publication-ready charts and markdown drafts for the party website.
 
 ## Prerequisites

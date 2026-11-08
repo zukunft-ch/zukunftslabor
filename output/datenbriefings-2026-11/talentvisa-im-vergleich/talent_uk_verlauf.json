@@ -1,0 +1,126 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "config": {
+    "font": "Switzer, system-ui, sans-serif",
+    "view": {
+      "stroke": "transparent"
+    }
+  },
+  "data": {
+    "values": [
+      {
+        "Jahr": 2019,
+        "Gruppe": "Hauptgesuchstellende",
+        "Visa": 794
+      },
+      {
+        "Jahr": 2019,
+        "Gruppe": "Familienangehörige",
+        "Visa": 378
+      },
+      {
+        "Jahr": 2020,
+        "Gruppe": "Hauptgesuchstellende",
+        "Visa": 905
+      },
+      {
+        "Jahr": 2020,
+        "Gruppe": "Familienangehörige",
+        "Visa": 476
+      },
+      {
+        "Jahr": 2021,
+        "Gruppe": "Hauptgesuchstellende",
+        "Visa": 1847
+      },
+      {
+        "Jahr": 2021,
+        "Gruppe": "Familienangehörige",
+        "Visa": 1246
+      },
+      {
+        "Jahr": 2022,
+        "Gruppe": "Hauptgesuchstellende",
+        "Visa": 2975
+      },
+      {
+        "Jahr": 2022,
+        "Gruppe": "Familienangehörige",
+        "Visa": 2301
+      },
+      {
+        "Jahr": 2023,
+        "Gruppe": "Hauptgesuchstellende",
+        "Visa": 4112
+      },
+      {
+        "Jahr": 2023,
+        "Gruppe": "Familienangehörige",
+        "Visa": 3250
+      },
+      {
+        "Jahr": 2024,
+        "Gruppe": "Hauptgesuchstellende",
+        "Visa": 3878
+      },
+      {
+        "Jahr": 2024,
+        "Gruppe": "Familienangehörige",
+        "Visa": 2812
+      },
+      {
+        "Jahr": 2025,
+        "Gruppe": "Hauptgesuchstellende",
+        "Visa": 3903
+      },
+      {
+        "Jahr": 2025,
+        "Gruppe": "Familienangehörige",
+        "Visa": 2750
+      }
+    ]
+  },
+  "encoding": {
+    "x": {
+      "field": "Jahr",
+      "type": "ordinal",
+      "title": "Jahr"
+    },
+    "y": {
+      "field": "Visa",
+      "type": "quantitative",
+      "title": "Erteilte Visa",
+      "axis": {
+        "format": "d"
+      }
+    },
+    "color": {
+      "field": "Gruppe",
+      "type": "nominal",
+      "title": null,
+      "legend": {
+        "orient": "bottom"
+      }
+    },
+    "tooltip": [
+      {
+        "field": "Jahr"
+      },
+      {
+        "field": "Gruppe"
+      },
+      {
+        "field": "Visa",
+        "format": "d"
+      }
+    ]
+  },
+  "height": 340,
+  "mark": {
+    "type": "line",
+    "point": true,
+    "strokeWidth": 2
+  },
+  "title": "UK Global Talent: erteilte Einreisevisa 2019–2025",
+  "width": 720
+}

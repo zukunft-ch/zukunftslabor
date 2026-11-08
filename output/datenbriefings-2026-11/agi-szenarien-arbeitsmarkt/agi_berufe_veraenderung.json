@@ -1,0 +1,91 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "config": {
+    "font": "Switzer, system-ui, sans-serif",
+    "view": {
+      "stroke": "transparent"
+    }
+  },
+  "data": {
+    "values": [
+      {
+        "Berufshauptgruppe": "Intellektuelle und wissenschaftliche Berufe",
+        "Veränderung": 339.9,
+        "order": 0
+      },
+      {
+        "Berufshauptgruppe": "Techniker/innen und gleichrangige Berufe",
+        "Veränderung": 245.2,
+        "order": 1
+      },
+      {
+        "Berufshauptgruppe": "Führungskräfte",
+        "Veränderung": 159.7,
+        "order": 2
+      },
+      {
+        "Berufshauptgruppe": "Dienstleistungsberufe und Verkauf",
+        "Veränderung": 37.5,
+        "order": 3
+      },
+      {
+        "Berufshauptgruppe": "Hilfsarbeitskräfte",
+        "Veränderung": 33.1,
+        "order": 4
+      },
+      {
+        "Berufshauptgruppe": "Anlagen- und Maschinenbedienung, Montage",
+        "Veränderung": -13.4,
+        "order": 5
+      },
+      {
+        "Berufshauptgruppe": "Land- und Forstwirtschaft, Fischerei",
+        "Veränderung": -38.3,
+        "order": 6
+      },
+      {
+        "Berufshauptgruppe": "Bürokräfte und verwandte Berufe",
+        "Veränderung": -53.8,
+        "order": 7
+      },
+      {
+        "Berufshauptgruppe": "Handwerks- und verwandte Berufe",
+        "Veränderung": -117.8,
+        "order": 8
+      }
+    ]
+  },
+  "encoding": {
+    "x": {
+      "field": "Veränderung",
+      "type": "quantitative",
+      "title": "Veränderung (in 1000)"
+    },
+    "y": {
+      "field": "Berufshauptgruppe",
+      "type": "nominal",
+      "sort": {
+        "field": "order"
+      },
+      "title": null
+    },
+    "tooltip": [
+      {
+        "field": "Berufshauptgruppe",
+        "type": "nominal"
+      },
+      {
+        "field": "Veränderung",
+        "type": "quantitative",
+        "format": ",.2~f"
+      }
+    ]
+  },
+  "height": 340,
+  "mark": {
+    "type": "bar",
+    "cornerRadiusEnd": 4
+  },
+  "title": "Veränderung der Erwerbstätigen 2010–2025 nach Berufshauptgruppe, in 1000",
+  "width": 720
+}

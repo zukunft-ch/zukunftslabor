@@ -1,0 +1,125 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "config": {
+    "font": "Switzer, system-ui, sans-serif",
+    "view": {
+      "stroke": "transparent"
+    }
+  },
+  "data": {
+    "values": [
+      {
+        "Jahr": 2006,
+        "Gesuche": 95
+      },
+      {
+        "Jahr": 2007,
+        "Gesuche": 249
+      },
+      {
+        "Jahr": 2008,
+        "Gesuche": 221
+      },
+      {
+        "Jahr": 2009,
+        "Gesuche": 232
+      },
+      {
+        "Jahr": 2010,
+        "Gesuche": 239
+      },
+      {
+        "Jahr": 2011,
+        "Gesuche": 470
+      },
+      {
+        "Jahr": 2012,
+        "Gesuche": 518
+      },
+      {
+        "Jahr": 2013,
+        "Gesuche": 470
+      },
+      {
+        "Jahr": 2014,
+        "Gesuche": 582
+      },
+      {
+        "Jahr": 2015,
+        "Gesuche": 600
+      },
+      {
+        "Jahr": 2016,
+        "Gesuche": 554
+      },
+      {
+        "Jahr": 2017,
+        "Gesuche": 586
+      },
+      {
+        "Jahr": 2018,
+        "Gesuche": 647
+      },
+      {
+        "Jahr": 2019,
+        "Gesuche": 916
+      },
+      {
+        "Jahr": 2020,
+        "Gesuche": 1193
+      },
+      {
+        "Jahr": 2021,
+        "Gesuche": 1385
+      },
+      {
+        "Jahr": 2022,
+        "Gesuche": 1180
+      },
+      {
+        "Jahr": 2023,
+        "Gesuche": 1738
+      },
+      {
+        "Jahr": 2024,
+        "Gesuche": 2232
+      },
+      {
+        "Jahr": 2025,
+        "Gesuche": 2145
+      }
+    ]
+  },
+  "encoding": {
+    "x": {
+      "field": "Jahr",
+      "type": "ordinal",
+      "title": "Jahr"
+    },
+    "y": {
+      "field": "Gesuche",
+      "type": "quantitative",
+      "title": "Gesuche pro Jahr",
+      "axis": {
+        "format": "d"
+      }
+    },
+    "tooltip": [
+      {
+        "field": "Jahr"
+      },
+      {
+        "field": "Gesuche",
+        "format": "d"
+      }
+    ]
+  },
+  "height": 340,
+  "mark": {
+    "type": "line",
+    "point": true,
+    "strokeWidth": 2
+  },
+  "title": "Zugangsgesuche nach BGÖ an die Bundesverwaltung, 2006–2025",
+  "width": 720
+}

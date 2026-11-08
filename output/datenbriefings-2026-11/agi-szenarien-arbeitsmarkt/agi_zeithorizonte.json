@@ -1,0 +1,78 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "config": {
+    "font": "Switzer, system-ui, sans-serif",
+    "view": {
+      "stroke": "transparent"
+    }
+  },
+  "data": {
+    "values": [
+      {
+        "Meilenstein": "Alle Aufgaben besser als Menschen (HLMI)",
+        "Wahrscheinlichkeit": "10 %",
+        "Jahr": 2027
+      },
+      {
+        "Meilenstein": "Alle Aufgaben besser als Menschen (HLMI)",
+        "Wahrscheinlichkeit": "50 %",
+        "Jahr": 2047
+      },
+      {
+        "Meilenstein": "Alle Berufe vollständig automatisierbar (FAOL)",
+        "Wahrscheinlichkeit": "10 %",
+        "Jahr": 2037
+      },
+      {
+        "Meilenstein": "Alle Berufe vollständig automatisierbar (FAOL)",
+        "Wahrscheinlichkeit": "50 %",
+        "Jahr": 2116
+      }
+    ]
+  },
+  "encoding": {
+    "x": {
+      "field": "Jahr",
+      "type": "quantitative",
+      "scale": {
+        "domain": [
+          2020,
+          2120
+        ]
+      },
+      "axis": {
+        "format": "d"
+      },
+      "title": "Jahr"
+    },
+    "y": {
+      "field": "Meilenstein",
+      "type": "nominal",
+      "title": null
+    },
+    "shape": {
+      "field": "Wahrscheinlichkeit",
+      "type": "nominal",
+      "title": "Wahrscheinlichkeit"
+    },
+    "tooltip": [
+      {
+        "field": "Meilenstein"
+      },
+      {
+        "field": "Wahrscheinlichkeit"
+      },
+      {
+        "field": "Jahr"
+      }
+    ]
+  },
+  "height": 180,
+  "mark": {
+    "type": "point",
+    "filled": true,
+    "size": 160
+  },
+  "title": "Erwartete Jahre laut Umfrage unter 2'778 KI-Forschenden (aggregierte Prognose)",
+  "width": 720
+}

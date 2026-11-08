@@ -1,0 +1,121 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "config": {
+    "font": "Switzer, system-ui, sans-serif",
+    "view": {
+      "stroke": "transparent"
+    }
+  },
+  "data": {
+    "values": [
+      {
+        "Land": "Südkorea",
+        "Roboter": 1220,
+        "order": 0
+      },
+      {
+        "Land": "Singapur",
+        "Roboter": 818,
+        "order": 1
+      },
+      {
+        "Land": "Schweiz verdoppelt (Ziel)",
+        "Roboter": 588,
+        "order": 2
+      },
+      {
+        "Land": "Deutschland",
+        "Roboter": 449,
+        "order": 3
+      },
+      {
+        "Land": "Japan",
+        "Roboter": 446,
+        "order": 4
+      },
+      {
+        "Land": "Schweden",
+        "Roboter": 377,
+        "order": 5
+      },
+      {
+        "Land": "Dänemark",
+        "Roboter": 329,
+        "order": 6
+      },
+      {
+        "Land": "Slowenien",
+        "Roboter": 315,
+        "order": 7
+      },
+      {
+        "Land": "USA",
+        "Roboter": 307,
+        "order": 8
+      },
+      {
+        "Land": "Taiwan",
+        "Roboter": 302,
+        "order": 9
+      },
+      {
+        "Land": "Schweiz",
+        "Roboter": 294,
+        "order": 10
+      },
+      {
+        "Land": "Kanada",
+        "Roboter": 241,
+        "order": 11
+      },
+      {
+        "Land": "EU-27 (Durchschnitt)",
+        "Roboter": 231,
+        "order": 12
+      },
+      {
+        "Land": "China",
+        "Roboter": 166,
+        "order": 13
+      },
+      {
+        "Land": "Welt (Durchschnitt)",
+        "Roboter": 132,
+        "order": 14
+      }
+    ]
+  },
+  "encoding": {
+    "x": {
+      "field": "Roboter",
+      "type": "quantitative",
+      "title": "Roboter pro 10'000 Beschäftigte"
+    },
+    "y": {
+      "field": "Land",
+      "type": "nominal",
+      "sort": {
+        "field": "order"
+      },
+      "title": null
+    },
+    "tooltip": [
+      {
+        "field": "Land",
+        "type": "nominal"
+      },
+      {
+        "field": "Roboter",
+        "type": "quantitative",
+        "format": ",.2~f"
+      }
+    ]
+  },
+  "height": 440,
+  "mark": {
+    "type": "bar",
+    "cornerRadiusEnd": 4
+  },
+  "title": "Industrieroboter pro 10'000 Beschäftigte in der Industrie (2024)",
+  "width": 720
+}

@@ -1,0 +1,82 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "config": {
+    "font": "Switzer, system-ui, sans-serif",
+    "view": {
+      "stroke": "transparent"
+    }
+  },
+  "data": {
+    "values": [
+      {
+        "Jahr": 2018,
+        "Anteil": 50
+      },
+      {
+        "Jahr": 2019,
+        "Anteil": 57
+      },
+      {
+        "Jahr": 2020,
+        "Anteil": 43
+      },
+      {
+        "Jahr": 2021,
+        "Anteil": 42
+      },
+      {
+        "Jahr": 2022,
+        "Anteil": 25
+      },
+      {
+        "Jahr": 2023,
+        "Anteil": 27
+      },
+      {
+        "Jahr": 2024,
+        "Anteil": 28
+      },
+      {
+        "Jahr": 2025,
+        "Anteil": 24
+      }
+    ]
+  },
+  "encoding": {
+    "x": {
+      "field": "Jahr",
+      "type": "ordinal",
+      "title": "Jahr",
+      "axis": {
+        "labelAngle": 0
+      }
+    },
+    "y": {
+      "field": "Anteil",
+      "type": "quantitative",
+      "title": "Anteil (%)",
+      "scale": {
+        "domain": [
+          0,
+          100
+        ]
+      }
+    },
+    "tooltip": [
+      {
+        "field": "Jahr"
+      },
+      {
+        "field": "Anteil",
+        "title": "Anteil (%)"
+      }
+    ]
+  },
+  "height": 300,
+  "mark": {
+    "type": "bar",
+    "cornerRadiusEnd": 4
+  },
+  "title": "Schlichtungsverfahren beim EDÖB: Anteil innert 30 Tagen erledigt",
+  "width": 720
+}

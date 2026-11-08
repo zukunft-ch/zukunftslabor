@@ -1,0 +1,91 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "config": {
+    "font": "Switzer, system-ui, sans-serif",
+    "view": {
+      "stroke": "transparent"
+    }
+  },
+  "data": {
+    "values": [
+      {
+        "Berufshauptgruppe": "Intellektuelle und wissenschaftliche Berufe",
+        "Erwerbstätige": 1298.6,
+        "order": 0
+      },
+      {
+        "Berufshauptgruppe": "Techniker/innen und gleichrangige Berufe",
+        "Erwerbstätige": 843.7,
+        "order": 1
+      },
+      {
+        "Berufshauptgruppe": "Dienstleistungsberufe und Verkauf",
+        "Erwerbstätige": 640.5,
+        "order": 2
+      },
+      {
+        "Berufshauptgruppe": "Bürokräfte und verwandte Berufe",
+        "Erwerbstätige": 570.6,
+        "order": 3
+      },
+      {
+        "Berufshauptgruppe": "Handwerks- und verwandte Berufe",
+        "Erwerbstätige": 436.2,
+        "order": 4
+      },
+      {
+        "Berufshauptgruppe": "Führungskräfte",
+        "Erwerbstätige": 426.6,
+        "order": 5
+      },
+      {
+        "Berufshauptgruppe": "Hilfsarbeitskräfte",
+        "Erwerbstätige": 285.6,
+        "order": 6
+      },
+      {
+        "Berufshauptgruppe": "Anlagen- und Maschinenbedienung, Montage",
+        "Erwerbstätige": 176.1,
+        "order": 7
+      },
+      {
+        "Berufshauptgruppe": "Land- und Forstwirtschaft, Fischerei",
+        "Erwerbstätige": 97.2,
+        "order": 8
+      }
+    ]
+  },
+  "encoding": {
+    "x": {
+      "field": "Erwerbstätige",
+      "type": "quantitative",
+      "title": "Erwerbstätige (in 1000)"
+    },
+    "y": {
+      "field": "Berufshauptgruppe",
+      "type": "nominal",
+      "sort": {
+        "field": "order"
+      },
+      "title": null
+    },
+    "tooltip": [
+      {
+        "field": "Berufshauptgruppe",
+        "type": "nominal"
+      },
+      {
+        "field": "Erwerbstätige",
+        "type": "quantitative",
+        "format": ",.2~f"
+      }
+    ]
+  },
+  "height": 340,
+  "mark": {
+    "type": "bar",
+    "cornerRadiusEnd": 4
+  },
+  "title": "Erwerbstätige nach Berufshauptgruppe (CH-ISCO-19), 2025, in 1000",
+  "width": 720
+}

@@ -1,0 +1,73 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "config": {
+    "font": "Switzer, system-ui, sans-serif",
+    "view": {
+      "stroke": "transparent"
+    }
+  },
+  "data": {
+    "values": [
+      {
+        "Jahr": 2018,
+        "Rang": 15,
+        "EGDI": 0.85
+      },
+      {
+        "Jahr": 2020,
+        "Rang": 16,
+        "EGDI": 0.8907
+      },
+      {
+        "Jahr": 2022,
+        "Rang": 23,
+        "EGDI": 0.8752
+      },
+      {
+        "Jahr": 2024,
+        "Rang": 26,
+        "EGDI": 0.9004
+      }
+    ]
+  },
+  "encoding": {
+    "x": {
+      "field": "Jahr",
+      "type": "ordinal",
+      "title": "Erhebungsjahr"
+    },
+    "y": {
+      "field": "Rang",
+      "type": "quantitative",
+      "title": "Rang (von 193 Staaten)",
+      "scale": {
+        "reverse": true,
+        "domain": [
+          1,
+          30
+        ]
+      }
+    },
+    "tooltip": [
+      {
+        "field": "Jahr"
+      },
+      {
+        "field": "Rang"
+      },
+      {
+        "field": "EGDI",
+        "title": "EGDI-Wert",
+        "format": ".2f"
+      }
+    ]
+  },
+  "height": 320,
+  "mark": {
+    "type": "line",
+    "point": true,
+    "strokeWidth": 2
+  },
+  "title": "Schweiz im UN-E-Government-Index: Rang 2018–2024",
+  "width": 720
+}

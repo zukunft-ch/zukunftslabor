@@ -1,0 +1,76 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "config": {
+    "font": "Switzer, system-ui, sans-serif",
+    "view": {
+      "stroke": "transparent"
+    }
+  },
+  "data": {
+    "values": [
+      {
+        "Programm": "Schweiz: Drittstaatenkontingente genutzt",
+        "Anzahl": 6290,
+        "Art": "Schätzung (74 % von 8'500)"
+      },
+      {
+        "Programm": "UK: Global Talent (Hauptgesuchstellende)",
+        "Anzahl": 3877,
+        "Art": "amtlich"
+      },
+      {
+        "Programm": "Singapur: ONE Pass ausgestellt",
+        "Anzahl": 3000,
+        "Art": "amtlich (gerundet)"
+      },
+      {
+        "Programm": "Hongkong: Top Talent Pass bewilligt",
+        "Anzahl": 38900,
+        "Art": "Schätzung (Ø pro Jahr 2023–Jan. 2026)"
+      }
+    ]
+  },
+  "encoding": {
+    "y": {
+      "field": "Programm",
+      "type": "nominal",
+      "title": null,
+      "sort": "-x"
+    },
+    "x": {
+      "field": "Anzahl",
+      "type": "quantitative",
+      "title": "Anzahl pro Jahr",
+      "axis": {
+        "format": "d"
+      }
+    },
+    "color": {
+      "field": "Art",
+      "type": "nominal",
+      "title": null,
+      "legend": {
+        "orient": "bottom"
+      }
+    },
+    "tooltip": [
+      {
+        "field": "Programm"
+      },
+      {
+        "field": "Anzahl",
+        "format": "d"
+      },
+      {
+        "field": "Art"
+      }
+    ]
+  },
+  "height": 240,
+  "mark": {
+    "type": "bar",
+    "cornerRadiusEnd": 4
+  },
+  "title": "Bewilligungen pro Jahr, 2024 bzw. Durchschnitt (nicht direkt vergleichbar)",
+  "width": 720
+}

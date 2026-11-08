@@ -1,0 +1,16 @@
+name: Fehler / Korrektur
+description: Ein Wert, eine Quelle oder eine Aussage in einer Notiz stimmt nicht.
+labels: ["korrektur"]
+body:
+  - type: input
+    id: notiz
+    attributes:
+      label: Welche Notiz oder welcher Indikator? (Link)
+    validations:
+      required: true
+  - type: textarea
+    id: fehler
+    attributes:
+      label: Was ist falsch, und was ist richtig? Mit Quelle.
+    validations:
+      required: true

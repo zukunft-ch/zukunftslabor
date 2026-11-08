@@ -1,0 +1,184 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "config": {
+    "font": "Switzer, system-ui, sans-serif",
+    "view": {
+      "stroke": "transparent"
+    }
+  },
+  "data": {
+    "values": [
+      {
+        "Land": "Schweiz",
+        "Komponente": "Institutioneller Rahmen",
+        "Wert": 1.0
+      },
+      {
+        "Land": "Schweiz",
+        "Komponente": "Dienstangebot",
+        "Wert": 0.8072
+      },
+      {
+        "Land": "Schweiz",
+        "Komponente": "Inhalte",
+        "Wert": 0.8889
+      },
+      {
+        "Land": "Schweiz",
+        "Komponente": "E-Partizipation",
+        "Wert": 0.8219
+      },
+      {
+        "Land": "Schweiz",
+        "Komponente": "Technologie",
+        "Wert": 0.625
+      },
+      {
+        "Land": "Dänemark",
+        "Komponente": "Institutioneller Rahmen",
+        "Wert": 1.0
+      },
+      {
+        "Land": "Dänemark",
+        "Komponente": "Dienstangebot",
+        "Wert": 0.988
+      },
+      {
+        "Land": "Dänemark",
+        "Komponente": "Inhalte",
+        "Wert": 1.0
+      },
+      {
+        "Land": "Dänemark",
+        "Komponente": "E-Partizipation",
+        "Wert": 0.9863
+      },
+      {
+        "Land": "Dänemark",
+        "Komponente": "Technologie",
+        "Wert": 0.875
+      },
+      {
+        "Land": "Estland",
+        "Komponente": "Institutioneller Rahmen",
+        "Wert": 1.0
+      },
+      {
+        "Land": "Estland",
+        "Komponente": "Dienstangebot",
+        "Wert": 1.0
+      },
+      {
+        "Land": "Estland",
+        "Komponente": "Inhalte",
+        "Wert": 1.0
+      },
+      {
+        "Land": "Estland",
+        "Komponente": "E-Partizipation",
+        "Wert": 0.9589
+      },
+      {
+        "Land": "Estland",
+        "Komponente": "Technologie",
+        "Wert": 0.875
+      },
+      {
+        "Land": "Deutschland",
+        "Komponente": "Institutioneller Rahmen",
+        "Wert": 1.0
+      },
+      {
+        "Land": "Deutschland",
+        "Komponente": "Dienstangebot",
+        "Wert": 0.8434
+      },
+      {
+        "Land": "Deutschland",
+        "Komponente": "Inhalte",
+        "Wert": 0.8889
+      },
+      {
+        "Land": "Deutschland",
+        "Komponente": "E-Partizipation",
+        "Wert": 0.9726
+      },
+      {
+        "Land": "Deutschland",
+        "Komponente": "Technologie",
+        "Wert": 0.875
+      }
+    ]
+  },
+  "encoding": {
+    "x": {
+      "field": "Komponente",
+      "type": "nominal",
+      "title": null,
+      "sort": [
+        "Institutioneller Rahmen",
+        "Dienstangebot",
+        "Inhalte",
+        "E-Partizipation",
+        "Technologie"
+      ],
+      "axis": {
+        "labelAngle": 0
+      }
+    },
+    "xOffset": {
+      "field": "Land",
+      "type": "nominal",
+      "sort": [
+        "Schweiz",
+        "Deutschland",
+        "Dänemark",
+        "Estland"
+      ]
+    },
+    "y": {
+      "field": "Wert",
+      "type": "quantitative",
+      "title": "Indexwert",
+      "scale": {
+        "domain": [
+          0,
+          1
+        ]
+      }
+    },
+    "color": {
+      "field": "Land",
+      "type": "nominal",
+      "title": null,
+      "sort": [
+        "Schweiz",
+        "Deutschland",
+        "Dänemark",
+        "Estland"
+      ],
+      "legend": {
+        "orient": "bottom"
+      }
+    },
+    "tooltip": [
+      {
+        "field": "Land"
+      },
+      {
+        "field": "Komponente"
+      },
+      {
+        "field": "Wert",
+        "format": ".3f"
+      }
+    ]
+  },
+  "height": 360,
+  "mark": {
+    "type": "bar",
+    "cornerRadiusEnd": 3
+  },
+  "title": "Online-Service-Index 2024 nach Komponenten (0–1)",
+  "width": 720
+}
